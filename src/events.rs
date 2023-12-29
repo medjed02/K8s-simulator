@@ -8,19 +8,7 @@ pub mod assigning {
     }
 
     #[derive(Clone)]
-    pub struct PodAssigningCommitRequest {
-        pub pod_id: u64,
-        pub node_id: u64,
-    }
-
-    #[derive(Clone)]
-    pub struct PodAssigningCommitSucceeded {
-        pub pod_id: u64,
-        pub node_id: u64,
-    }
-
-    #[derive(Clone)]
-    pub struct PodAssigningCommitFailed {
+    pub struct PodAssigningSucceeded {
         pub pod_id: u64,
         pub node_id: u64,
     }
@@ -28,17 +16,41 @@ pub mod assigning {
     #[derive(Clone)]
     pub struct PodAssigningFailed {
         pub pod_id: u64,
+    }
+
+    #[derive(Clone)]
+    pub struct PodPlacementRequest {
+        pub pod_id: u64,
         pub node_id: u64,
     }
 
     #[derive(Clone)]
-    pub struct PodAssigningSucceeded {
+    pub struct PodPlacementSucceeded {
+        pub pod_id: u64,
+        pub node_id: u64,
+    }
+
+    #[derive(Clone)]
+    pub struct PodPlacementFailed {
         pub pod_id: u64,
         pub node_id: u64,
     }
 
     #[derive(Clone)]
     pub struct PodMigrationRequest {
+        pub pod_id: u64,
+        pub source_node_id: u64,
+    }
+
+    #[derive(Clone)]
+    pub struct PodMigrationSucceeded {
+        pub pod_id: u64,
+        pub source_node_id: u64,
+        pub distance_node_id: u64,
+    }
+
+    #[derive(Clone)]
+    pub struct PodMigrationFailed {
         pub pod_id: u64,
         pub source_node_id: u64,
     }

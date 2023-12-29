@@ -64,7 +64,7 @@ impl Pod {
 }
 
 
-// Comparision operators for prioritizing pods
+/// Comparision operators for prioritizing pods
 impl Eq for Pod {}
 
 impl PartialEq for Pod {

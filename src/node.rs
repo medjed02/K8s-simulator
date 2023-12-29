@@ -31,6 +31,7 @@ pub struct Node {
     pub memory_load: f64,
     pub state: NodeState,
     pods: HashMap<u64, Pod>,
+
     ctx: SimulationContext,
 }
 

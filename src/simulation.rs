@@ -1,12 +1,13 @@
+use std::cell::RefCell;
+use std::rc::Rc;
 use dslab_core::context::SimulationContext;
 use dslab_core::simulation::Simulation;
 use crate::api_server::APIServer;
 use crate::scheduler::Scheduler;
 
 pub struct K8sSimulation {
-    // TODO: pointers of all objects
-    scheduler: Scheduler,
-    api_server: APIServer,
+    scheduler: Rc<RefCell<Scheduler>>,
+    api_server: Rc<RefCell<APIServer>>,
     
     sim: Simulation,
     ctx: SimulationContext,
