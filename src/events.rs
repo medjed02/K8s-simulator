@@ -2,9 +2,11 @@
 
 // POD ASSIGNING EVENTS //
 pub mod assigning {
+    use crate::pod::Pod;
+
     #[derive(Clone)]
     pub struct PodAssigningRequest {
-        pub pod_id: u64,
+        pub pod: Pod,
     }
 
     #[derive(Clone)]
@@ -58,14 +60,19 @@ pub mod assigning {
 
 // NODE CHANGING STATUS EVENTS //
 pub mod node {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    use crate::node::{Node, NodeState};
+
     #[derive(Clone)]
-    pub struct NodeWorking {
+    pub struct NodeStatusChanged {
         pub node_id: u64,
+        pub new_status: NodeState,
     }
 
     #[derive(Clone)]
-    pub struct NodeFailed {
-        pub node_id: u64,
+    pub struct NewNodeAdded {
+        pub node: Rc<RefCell<Node>>,
     }
 }
 
@@ -76,6 +83,9 @@ pub mod scheduler {
 
 // API SERVER INTERACTION EVENTS //
 pub mod api_server {
+    use std::cell::RefCell;
+    use std::collections::HashMap;
+    use std::rc::Rc;
     use crate::node::Node;
     use crate::pod::Pod;
 
@@ -85,7 +95,7 @@ pub mod api_server {
 
     #[derive(Clone)]
     pub struct GetPodResponse {
-        pub pod: Pod,
+        pub pod: Option<Pod>,
     }
 
     #[derive(Clone)]
@@ -94,7 +104,6 @@ pub mod api_server {
 
     #[derive(Clone)]
     pub struct GetNodesResponse {
-        // TODO: need a pointer, not vec
-        pub nodes: Vec<Node>,
+        pub nodes: Rc<RefCell<HashMap<u64, Rc<RefCell<Node>>>>>,
     }
 }

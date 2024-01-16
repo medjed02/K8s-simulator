@@ -2,7 +2,6 @@
 
 use std::fmt::{Display, Formatter};
 use std::cmp::Ordering;
-use dslab_core::context::SimulationContext;
 
 
 /// Pod status
@@ -30,25 +29,23 @@ impl Display for PodStatus {
 #[derive(Clone)]
 pub struct Pod {
     pub id: u64,
-    pub requested_cpu: f64,
+    pub requested_cpu: f32,
     pub requested_memory: f64,
-    pub limit_cpu: f64,
+    pub limit_cpu: f32,
     pub limit_memory: f64,
     pub priority_weight: u64,
     pub status: PodStatus,
-    ctx: SimulationContext,
 }
 
 impl Pod {
     pub fn new(
         id: u64,
-        requested_cpu: f64,
+        requested_cpu: f32,
         requested_memory: f64,
-        limit_cpu: f64,
+        limit_cpu: f32,
         limit_memory: f64,
         priority_weight: u64,
         status: PodStatus,
-        ctx: SimulationContext
     ) -> Self {
         Self {
             id,
@@ -58,7 +55,6 @@ impl Pod {
             limit_memory,
             priority_weight,
             status,
-            ctx
         }
     }
 }

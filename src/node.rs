@@ -25,22 +25,21 @@ impl Display for NodeState {
 #[derive(Clone)]
 pub struct Node {
     pub id: u64,
-    pub cpu_total: f64,
-    pub memory_total: f64,
-    pub cpu_load: f64,
+    pub cpu_total: u32,
+    pub memory_total: u64,
+    pub cpu_load: f32,
     pub memory_load: f64,
     pub state: NodeState,
     pods: HashMap<u64, Pod>,
-
     ctx: SimulationContext,
 }
 
 impl Node {
     pub fn new(
         id: u64,
-        cpu_total: f64,
-        memory_total: f64,
-        cpu_load: f64,
+        cpu_total: u32,
+        memory_total: u64,
+        cpu_load: f32,
         memory_load: f64,
         state: NodeState,
         ctx: SimulationContext
@@ -57,7 +56,7 @@ impl Node {
         }
     }
 
-    pub fn get_free_cpu(&self) -> f64 {
+    pub fn get_free_cpu(&self) -> f32 {
         self.cpu_total - self.cpu_load
     }
 
@@ -77,8 +76,9 @@ impl Node {
         if self.get_free_cpu() < pod.requested_cpu || self.get_free_memory() < pod.requested_memory {
             return false;
         }
+        self.cpu_load += pod.requested_cpu;
+        self.memory_load += pod.requested_memory;
         self.pods.insert(pod.id, pod);
-        // ctx.submit_pod
         true
     }
 
