@@ -75,7 +75,7 @@ impl K8sSimulation {
         let node = rc!(refcell!(Node::new(cpu_total, memory_total, 0.0, 0.0, NodeState::Working,
             self.api_server.clone(), node_ctx, self.sim_config.clone())));
         self.sim.add_handler(name, node.clone());
-        self.api_server.borrow().add_new_node(node.clone());
+        self.api_server.borrow_mut().add_new_node(node.clone());
         self.last_node_id
     }
 
@@ -127,6 +127,11 @@ impl K8sSimulation {
     /// Performs the specified number of steps through the simulation (see dslab-core docs).
     pub fn steps(&mut self, step_count: u64) -> bool {
         self.sim.steps(step_count)
+    }
+
+    /// Steps through the simulation until there are no pending events left.
+    pub fn step_until_no_events(&mut self) {
+        self.sim.step_until_no_events();
     }
 
     /// Steps through the simulation with duration limit (see dslab-core docs).

@@ -6,15 +6,15 @@ use crate::pod::Pod;
 use crate::scheduler_algorithm::SchedulerAlgorithm;
 
 #[derive(Default)]
-pub struct MRPAlgorithm;
+pub struct LRPAlgorithm;
 
-impl MRPAlgorithm {
+impl LRPAlgorithm {
     pub fn new() -> Self {
         Default::default()
     }
 }
 
-impl SchedulerAlgorithm for MRPAlgorithm {
+impl SchedulerAlgorithm for LRPAlgorithm {
     fn filter(&self, pod: &Pod, nodes: &HashMap<u32, Rc<RefCell<Node>>>) -> Vec<u32> {
         let mut filtered_nodes = Vec::<u32>::default();
         for (node_id, node) in nodes.into_iter() {
@@ -30,8 +30,8 @@ impl SchedulerAlgorithm for MRPAlgorithm {
              filtered_node_ids: &Vec<u32>) -> Vec<f64> {
         let mut scores = Vec::<f64>::default();
         for node_id in filtered_node_ids {
-            let mut score = 10.0 * (1.0 - nodes.get(node_id).unwrap().borrow().get_cpu_utilization());
-            score += 10.0 * (1.0 - nodes.get(node_id).unwrap().borrow().get_memory_utilization());
+            let mut score = 10.0 * nodes.get(node_id).unwrap().borrow().get_cpu_utilization();
+            score += 10.0 * nodes.get(node_id).unwrap().borrow().get_memory_utilization();
             score /= 2.0;
             scores.push(score);
         }

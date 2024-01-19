@@ -31,7 +31,11 @@ impl Scheduler {
     }
 
     pub fn schedule_next_pod(&mut self) {
-        match self.api_server.borrow_mut().get_pod() {
+        let pod_option;
+        {
+            pod_option = self.api_server.borrow_mut().get_pod();
+        }
+        match pod_option {
             None => {},
             Some(pod) => {
                 let mut elapsed_time = self.sim_config.control_plane_message_delay;
