@@ -2,108 +2,83 @@
 
 // POD ASSIGNING EVENTS //
 pub mod assigning {
+    use serde::Serialize;
     use crate::pod::Pod;
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodAssigningRequest {
         pub pod: Pod,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodAssigningSucceeded {
-        pub pod_id: u64,
-        pub node_id: u64,
+        pub pod: Pod,
+        pub node_id: u32,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodAssigningFailed {
-        pub pod_id: u64,
+        pub pod: Pod,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodPlacementRequest {
-        pub pod_id: u64,
-        pub node_id: u64,
+        pub pod: Pod,
+        pub node_id: u32,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodPlacementSucceeded {
         pub pod_id: u64,
-        pub node_id: u64,
+        pub node_id: u32,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodPlacementFailed {
         pub pod_id: u64,
-        pub node_id: u64,
+        pub node_id: u32,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodMigrationRequest {
         pub pod_id: u64,
-        pub source_node_id: u64,
+        pub source_node_id: u32,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodMigrationSucceeded {
         pub pod_id: u64,
-        pub source_node_id: u64,
-        pub distance_node_id: u64,
+        pub source_node_id: u32,
+        pub distance_node_id: u32,
     }
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct PodMigrationFailed {
         pub pod_id: u64,
-        pub source_node_id: u64,
+        pub source_node_id: u32,
     }
 }
 
 // NODE CHANGING STATUS EVENTS //
 pub mod node {
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use crate::node::{Node, NodeState};
+    use serde::Serialize;
+    use crate::node::{NodeState};
 
-    #[derive(Clone)]
+    #[derive(Clone, Serialize)]
     pub struct NodeStatusChanged {
-        pub node_id: u64,
+        pub node_id: u32,
         pub new_status: NodeState,
-    }
-
-    #[derive(Clone)]
-    pub struct NewNodeAdded {
-        pub node: Rc<RefCell<Node>>,
     }
 }
 
 // SCHEDULER'S WORK EVENTS //
 pub mod scheduler {
-
+    use serde::Serialize;
+    #[derive(Clone, Serialize)]
+    pub struct SchedulerCycle {
+    }
 }
 
 // API SERVER INTERACTION EVENTS //
 pub mod api_server {
-    use std::cell::RefCell;
-    use std::collections::HashMap;
-    use std::rc::Rc;
-    use crate::node::Node;
-    use crate::pod::Pod;
-
-    #[derive(Clone)]
-    pub struct GetPodRequest {
-    }
-
-    #[derive(Clone)]
-    pub struct GetPodResponse {
-        pub pod: Option<Pod>,
-    }
-
-    #[derive(Clone)]
-    pub struct GetNodesRequest {
-    }
-
-    #[derive(Clone)]
-    pub struct GetNodesResponse {
-        pub nodes: Rc<RefCell<HashMap<u64, Rc<RefCell<Node>>>>>,
-    }
 }

@@ -2,10 +2,11 @@
 
 use std::fmt::{Display, Formatter};
 use std::cmp::Ordering;
+use serde::Serialize;
 
 
 /// Pod status
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum PodStatus {
     Pending,
     Running,
@@ -26,7 +27,7 @@ impl Display for PodStatus {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct Pod {
     pub id: u64,
     pub requested_cpu: f32,

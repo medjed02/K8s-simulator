@@ -6,8 +6,9 @@ use crate::api_server::APIServer;
 use crate::scheduler::Scheduler;
 use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
+use crate::default_scheduler_algorithms::mrp_algorithm::MRPAlgorithm;
 use crate::events::assigning::PodAssigningRequest;
-use crate::events::node::{NewNodeAdded, NodeStatusChanged};
+use crate::events::node::NodeStatusChanged;
 use crate::node::{Node, NodeState};
 use crate::pod::{Pod, PodStatus};
 
@@ -27,6 +28,7 @@ impl K8sSimulation {
     /// Creates a simulation with specified config.
     pub fn new(mut sim: Simulation, sim_config: SimulationConfig) -> Self {
         let sim_config = rc!(sim_config);
+
         let api_server = rc!(refcell!(
             APIServer::new(sim.create_context("api_server"), sim_config.clone())
         ));
@@ -34,7 +36,8 @@ impl K8sSimulation {
 
         let ctx = sim.create_context("simulation");
         let mut sim = Self {
-            scheduler: rc!(refcell!(Scheduler::new())),
+            scheduler: rc!(refcell!(Scheduler::new(api_server.clone(), Box::new(MRPAlgorithm::new()),
+                sim.create_context("scheduler"), sim_config.clone()))),
             api_server,
             sim,
             ctx,
@@ -43,15 +46,18 @@ impl K8sSimulation {
             last_node_id: 0
         };
 
-        for node_config in sim.sim_config.nodes {
+        sim.sim.add_handler("scheduler", sim.scheduler.clone());
+        {
+            sim.api_server.borrow_mut().set_scheduler(sim.scheduler.clone());
+        }
+
+        for node_config in sim.sim_config.nodes.clone() {
             for i in 0..node_config.count {
-                sim.last_node_id += 1;
-                let name = format!("node_{}", sim.last_node_id);
-                sim.add_node(&name, node_config.cpu, node_config.memory, 0.);
+                sim.add_node(node_config.cpu, node_config.memory);
             }
         }
 
-        for pod_config in sim.sim_config.pods {
+        for pod_config in sim.sim_config.pods.clone() {
             for i in 0..pod_config.count {
                 sim.submit_pod(pod_config.requested_cpu, pod_config.requested_memory, pod_config.limit_cpu,
                                pod_config.limit_memory, pod_config.priority_weight, pod_config.submit_time);
@@ -62,23 +68,23 @@ impl K8sSimulation {
     }
 
     /// Add new node to the k8s cluster, return node_id
-    pub fn add_node(&mut self, name: &str, cpu_total: u32, memory_total: u64, delay: f64) -> u64 {
+    pub fn add_node(&mut self, cpu_total: u32, memory_total: u64) -> u64 {
         self.last_node_id += 1;
-        let node_ctx = self.sim.create_context(name);
-        let node = rc!(refcell!(Node::new(self.last_node_id, cpu_total, memory_total,
-            0.0, 0.0, NodeState::Working, node_ctx)));
+        let name = format!("node_{}", self.last_node_id);
+        let node_ctx = self.sim.create_context(&name);
+        let node = rc!(refcell!(Node::new(cpu_total, memory_total, 0.0, 0.0, NodeState::Working,
+            self.api_server.clone(), node_ctx, self.sim_config.clone())));
         self.sim.add_handler(name, node.clone());
-        self.ctx.emit(NewNodeAdded { node: node.clone() }, self.sim.lookup_id("api_server"),
-                      self.sim_config.control_plane_message_delay + delay);
+        self.api_server.borrow().add_new_node(node.clone());
         self.last_node_id
     }
 
-    pub fn recover_node(&self, node_id: u64, delay: f64) {
+    pub fn recover_node(&self, node_id: u32, delay: f64) {
         self.ctx.emit(NodeStatusChanged { node_id, new_status: NodeState::Working },
                       self.sim.lookup_id("api_server"), self.sim_config.control_plane_message_delay + delay);
     }
 
-    pub fn remove_node(&self, node_id: u64, delay: f64) {
+    pub fn remove_node(&self, node_id: u32, delay: f64) {
         self.ctx.emit(NodeStatusChanged { node_id, new_status: NodeState::Failed },
                       self.sim.lookup_id("api_server"), self.sim_config.control_plane_message_delay + delay);
     }
