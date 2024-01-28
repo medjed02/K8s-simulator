@@ -75,10 +75,16 @@ pub mod node {
 pub mod scheduler {
     use serde::Serialize;
     #[derive(Clone, Serialize)]
-    pub struct SchedulerCycle {
+    pub struct SchedulingCycle {
     }
 }
 
 // API SERVER INTERACTION EVENTS //
 pub mod api_server {
+    use serde::Serialize;
+
+    #[derive(Clone, Serialize)]
+    pub struct PodRemoveRequest {
+        pub pod_id: u64,
+    }
 }

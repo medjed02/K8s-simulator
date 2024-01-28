@@ -1,7 +1,9 @@
 //! Simulation configuration.
 
+use serde::{Deserialize, Serialize};
+
 /// Holds configuration of a single node or a set of identical nodes.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct NodeConfig {
     /// Node CPU capacity.
     pub cpu: u32,
@@ -22,7 +24,7 @@ impl NodeConfig {
 }
 
 /// Holds configuration of a single node or a set of identical pods.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct PodConfig {
     /// Minimum CPU capacity.
     pub requested_cpu: f32,
@@ -55,9 +57,19 @@ impl PodConfig {
     }
 }
 
+/// Holds raw simulation config parsed from YAML file.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+struct RawSimulationConfig {
+    pub message_delay: Option<f64>,
+    pub control_plane_message_delay: Option<f64>,
+    pub pod_start_duration: Option<f64>,
+    pub pod_stop_duration: Option<f64>,
+    pub nodes: Option<Vec<NodeConfig>>,
+    pub pods: Option<Vec<PodConfig>>,
+}
 
 /// Represents simulation configuration.
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct SimulationConfig {
     /// Message delay in seconds for communications via network.
     pub message_delay: f64,
@@ -83,6 +95,21 @@ impl SimulationConfig {
             pod_stop_duration,
             nodes: Vec::default(),
             pods: Vec::default(),
+        }
+    }
+
+    pub fn from_file(file_name: &str) -> Self {
+        let raw: RawSimulationConfig = serde_yaml::from_str(
+            &std::fs::read_to_string(file_name).unwrap_or_else(|_| panic!("Can't read file {}", file_name)),
+        ).unwrap_or_else(|_| panic!("Can't parse YAML from file {}", file_name));
+
+        Self {
+            message_delay: raw.message_delay.unwrap_or(0.2),
+            control_plane_message_delay: raw.control_plane_message_delay.unwrap_or(0.0),
+            pod_start_duration: raw.pod_start_duration.unwrap_or(5.0),
+            pod_stop_duration: raw.pod_stop_duration.unwrap_or(5.0),
+            nodes: raw.nodes.unwrap_or_default(),
+            pods: raw.pods.unwrap_or_default(),
         }
     }
 }

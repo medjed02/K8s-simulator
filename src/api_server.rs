@@ -1,7 +1,7 @@
 //! Representation of the k8s API server
 
 use std::cell::RefCell;
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, BTreeMap, HashMap};
 use std::hash::Hash;
 use std::rc::Rc;
 use dslab_core::cast;
@@ -13,15 +13,16 @@ use crate::node::{Node, NodeState};
 use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
 use crate::events::node::NodeStatusChanged;
-use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest};
-use crate::events::scheduler::SchedulerCycle;
+use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest,
+                               PodPlacementSucceeded, PodPlacementFailed};
+use crate::events::api_server::PodRemoveRequest;
 use crate::scheduler::Scheduler;
 
 pub struct APIServer {
     pub id: u32,
-    pub pod_queue: BinaryHeap<Pod>,
-    pub working_nodes: HashMap<u32, Rc<RefCell<Node>>>,
-    pub failed_nodes: HashMap<u32, Rc<RefCell<Node>>>,
+    pub working_nodes: BTreeMap<u32, Rc<RefCell<Node>>>,
+    pub failed_nodes: BTreeMap<u32, Rc<RefCell<Node>>>,
+    pub pod_to_node_map: HashMap<u64, u32>,
     scheduler: Option<Rc<RefCell<Scheduler>>>,
 
     ctx: SimulationContext,
@@ -32,9 +33,9 @@ impl APIServer {
     pub fn new(ctx: SimulationContext, sim_config: Rc<SimulationConfig>) -> Self {
         Self {
             id: ctx.id(),
-            pod_queue: BinaryHeap::default(),
-            working_nodes: HashMap::default(),
-            failed_nodes: HashMap::default(),
+            working_nodes: BTreeMap::default(),
+            failed_nodes: BTreeMap::default(),
+            pod_to_node_map: HashMap::default(),
             scheduler: None,
             ctx,
             sim_config,
@@ -45,18 +46,6 @@ impl APIServer {
         self.scheduler = Some(scheduler);
     }
 
-    /// Add pod to the PodQueue
-    pub fn add_pod(&mut self, pod: Pod) {
-        if self.pod_queue.is_empty() {
-            self.ctx.emit(SchedulerCycle {}, self.scheduler.clone().unwrap().borrow().id, 0.0);
-        }
-        self.pod_queue.push(pod);
-    }
-
-    /// Pop next pod in the PodQueue
-    pub fn get_pod(&mut self) -> Option<Pod> {
-        self.pod_queue.pop()
-    }
 
     /// Add new node to the working nodes
     pub fn add_new_node(&mut self, node: Rc<RefCell<Node>>) {
@@ -74,12 +63,20 @@ impl APIServer {
     /// Remove node from the working nodes (maybe crash old node, maybe horizontal autoscaling)
     pub fn remove_node(&mut self, node_id: u32) {
         let node = self.working_nodes.remove(&node_id).unwrap();
-        node.borrow_mut().state = NodeState::Failed;
+        let mut mut_node = node.borrow_mut();
+        for (pod_id, pod) in mut_node.pods.clone().into_iter() {
+            self.ctx.emit(PodAssigningRequest { pod }, self.id, 0.0);
+        }
+        mut_node.pods.clear();
+        mut_node.state = NodeState::Failed;
+        mut_node.cpu_load = 0.0;
+        mut_node.memory_load = 0.0;
+        drop(mut_node);
         self.failed_nodes.insert(node_id, node);
     }
 
     /// Get list of working nodes
-    pub fn get_working_nodes(&self) -> &HashMap<u32, Rc<RefCell<Node>>> {
+    pub fn get_working_nodes(&self) -> &BTreeMap<u32, Rc<RefCell<Node>>> {
         &self.working_nodes
     }
 
@@ -135,12 +132,25 @@ impl EventHandler for APIServer {
                 }
             }
             PodAssigningRequest { pod } => {
-                self.add_pod(pod);
+                self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
             }
             PodAssigningSucceeded { pod, node_id } => {
                 let node_name = format!("node_{}", node_id);
                 self.ctx.emit(PodPlacementRequest { pod, node_id },
                     self.working_nodes.get(&node_id).unwrap().borrow().id, self.sim_config.message_delay);
+            }
+            PodAssigningFailed { pod } => {
+            }
+            PodPlacementSucceeded { pod_id, node_id } => {
+                self.pod_to_node_map.insert(pod_id, node_id);
+            }
+            PodPlacementFailed { pod_id, node_id } => {
+            }
+            PodRemoveRequest { pod_id } => {
+                let node_id = self.pod_to_node_map.get(&pod_id);
+                if node_id.is_some() {
+                    self.working_nodes.get(node_id.unwrap()).unwrap().borrow_mut().remove_pod(pod_id);
+                }
             }
         })
     }

@@ -36,7 +36,7 @@ pub struct Node {
     pub cpu_load: f32,
     pub memory_load: f64,
     pub state: NodeState,
-    pods: HashMap<u64, Pod>,
+    pub pods: HashMap<u64, Pod>,
     pub api_server: Rc<RefCell<APIServer>>,
 
     ctx: SimulationContext,
@@ -94,8 +94,10 @@ impl Node {
         true
     }
 
-    pub fn remove_pod(&mut self, pod_id: u64) {
-        self.pods.remove(&pod_id);
+    pub fn remove_pod(&mut self, pod_id: u64) -> Pod {
+        self.cpu_load -= self.pods.get(&pod_id).unwrap().requested_cpu;
+        self.memory_load -= self.pods.get(&pod_id).unwrap().requested_memory;
+        self.pods.remove(&pod_id).unwrap()
     }
 }
 

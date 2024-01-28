@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 use dslab_core::context::SimulationContext;
 use dslab_core::simulation::Simulation;
@@ -7,10 +8,12 @@ use crate::scheduler::Scheduler;
 use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
 use crate::default_scheduler_algorithms::mrp_algorithm::MRPAlgorithm;
+use crate::events::api_server::PodRemoveRequest;
 use crate::events::assigning::PodAssigningRequest;
 use crate::events::node::NodeStatusChanged;
 use crate::node::{Node, NodeState};
 use crate::pod::{Pod, PodStatus};
+use crate::scheduler_algorithm::SchedulerAlgorithm;
 
 pub struct K8sSimulation {
     scheduler: Rc<RefCell<Scheduler>>,
@@ -26,7 +29,8 @@ pub struct K8sSimulation {
 
 impl K8sSimulation {
     /// Creates a simulation with specified config.
-    pub fn new(mut sim: Simulation, sim_config: SimulationConfig) -> Self {
+    pub fn new(mut sim: Simulation, sim_config: SimulationConfig,
+               scheduler_algorithm: Box<dyn SchedulerAlgorithm>) -> Self {
         let sim_config = rc!(sim_config);
 
         let api_server = rc!(refcell!(
@@ -36,7 +40,7 @@ impl K8sSimulation {
 
         let ctx = sim.create_context("simulation");
         let mut sim = Self {
-            scheduler: rc!(refcell!(Scheduler::new(api_server.clone(), Box::new(MRPAlgorithm::new()),
+            scheduler: rc!(refcell!(Scheduler::new(api_server.clone(), scheduler_algorithm,
                 sim.create_context("scheduler"), sim_config.clone()))),
             api_server,
             sim,
@@ -68,25 +72,26 @@ impl K8sSimulation {
     }
 
     /// Add new node to the k8s cluster, return node_id
-    pub fn add_node(&mut self, cpu_total: u32, memory_total: u64) -> u64 {
+    pub fn add_node(&mut self, cpu_total: u32, memory_total: u64) -> u32 {
         self.last_node_id += 1;
         let name = format!("node_{}", self.last_node_id);
         let node_ctx = self.sim.create_context(&name);
         let node = rc!(refcell!(Node::new(cpu_total, memory_total, 0.0, 0.0, NodeState::Working,
             self.api_server.clone(), node_ctx, self.sim_config.clone())));
+        let node_id = node.borrow().id;
         self.sim.add_handler(name, node.clone());
         self.api_server.borrow_mut().add_new_node(node.clone());
-        self.last_node_id
+        node_id
     }
 
     pub fn recover_node(&self, node_id: u32, delay: f64) {
         self.ctx.emit(NodeStatusChanged { node_id, new_status: NodeState::Working },
-                      self.sim.lookup_id("api_server"), self.sim_config.control_plane_message_delay + delay);
+                      self.api_server.borrow().id, self.sim_config.control_plane_message_delay + delay);
     }
 
     pub fn remove_node(&self, node_id: u32, delay: f64) {
         self.ctx.emit(NodeStatusChanged { node_id, new_status: NodeState::Failed },
-                      self.sim.lookup_id("api_server"), self.sim_config.control_plane_message_delay + delay);
+                      self.api_server.borrow().id, self.sim_config.control_plane_message_delay + delay);
     }
 
     pub fn submit_pod(&mut self, requested_cpu: f32, requested_memory: f64, limit_cpu: f32,
@@ -94,15 +99,36 @@ impl K8sSimulation {
         self.last_pod_id += 1;
         let pod = Pod::new(self.last_pod_id, requested_cpu, requested_memory, limit_cpu, limit_memory,
                            priority_weight, PodStatus::Pending);
-        self.ctx.emit(PodAssigningRequest { pod }, self.sim.lookup_id("api_server"),
+        self.ctx.emit(PodAssigningRequest { pod }, self.api_server.borrow().id,
                       self.sim_config.control_plane_message_delay + delay);
         self.last_pod_id
     }
 
-    pub fn remove_pod() {
-        // PodRemoveRequest to API server
+    pub fn remove_pod(&self, pod_id: u64) {
+        self.ctx.emit(PodRemoveRequest { pod_id }, self.api_server.borrow().id,
+                      self.sim_config.message_delay);
     }
 
+    /// Returns the map with references to working nodes.
+    pub fn working_nodes(&self) -> BTreeMap<u32, Rc<RefCell<Node>>> {
+        self.api_server.borrow().working_nodes.clone()
+    }
+
+    /// Returns the map with references to failed nodes.
+    pub fn failed_nodes(&self) -> BTreeMap<u32, Rc<RefCell<Node>>> {
+        self.api_server.borrow().failed_nodes.clone()
+    }
+
+    /// Returns the reference to node (node status, resources).
+    pub fn node(&self, node_id: u32) -> Rc<RefCell<Node>> {
+        let api_server_ref = self.api_server.borrow();
+        let node = api_server_ref.working_nodes.get(&node_id);
+        if node.is_some() {
+            node.unwrap().clone()
+        } else {
+            api_server_ref.failed_nodes.get(&node_id).unwrap().clone()
+        }
+    }
 
     /// Returns the average CPU load across all working nodes.
     pub fn average_cpu_load(&self) -> f64 {

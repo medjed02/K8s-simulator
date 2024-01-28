@@ -1,2 +1,2 @@
 pub mod mrp_algorithm;
-mod lrp_algorithm;
+pub mod lrp_algorithm;

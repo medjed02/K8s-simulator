@@ -1,0 +1,4 @@
+message_delay: 0.5
+control_plane_message_delay: 0.0
+pod_start_duration: 3.0
+pod_stop_duration: 3.0

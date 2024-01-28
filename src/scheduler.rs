@@ -1,17 +1,20 @@
 use std::cell::RefCell;
+use std::collections::BinaryHeap;
 use std::rc::Rc;
 use dslab_core::{cast, Event, EventHandler, SimulationContext};
 use crate::api_server::APIServer;
-use crate::events::scheduler::SchedulerCycle;
+use crate::events::scheduler::SchedulingCycle;
 use crate::node::{Node, NodeState};
 use crate::scheduler_algorithm::SchedulerAlgorithm;
 use crate::simulation_config::SimulationConfig;
 use std::time::{Duration, Instant};
 use crate::events::assigning::{PodAssigningFailed, PodAssigningSucceeded};
 use crate::events::node::NodeStatusChanged;
+use crate::pod::Pod;
 
 pub struct Scheduler {
     pub id: u32,
+    pub active_queue: BinaryHeap<Pod>,
     api_server: Rc<RefCell<APIServer>>,
     scheduler_algorithm: Box<dyn SchedulerAlgorithm>,
     ctx: SimulationContext,
@@ -23,6 +26,7 @@ impl Scheduler {
                ctx: SimulationContext, sim_config: Rc<SimulationConfig>) -> Self {
         Self {
             id: ctx.id(),
+            active_queue: BinaryHeap::default(),
             api_server,
             scheduler_algorithm,
             ctx,
@@ -30,12 +34,21 @@ impl Scheduler {
         }
     }
 
-    pub fn schedule_next_pod(&mut self) {
-        let pod_option;
-        {
-            pod_option = self.api_server.borrow_mut().get_pod();
+    /// Add pod to the ActiveQueue
+    pub fn add_pod(&mut self, pod: Pod) {
+        if self.active_queue.is_empty() {
+            self.ctx.emit(SchedulingCycle {}, self.id, 0.0);
         }
-        match pod_option {
+        self.active_queue.push(pod);
+    }
+
+    /// Pop next pod in the ActiveQueue
+    pub fn get_pod(&mut self) -> Option<Pod> {
+        self.active_queue.pop()
+    }
+
+    pub fn schedule_next_pod(&mut self) {
+        match self.get_pod() {
             None => {},
             Some(pod) => {
                 let mut elapsed_time = self.sim_config.control_plane_message_delay;
@@ -47,7 +60,7 @@ impl Scheduler {
                 if filtered_nodes.is_empty() {
                     elapsed_time += start_of_algorithm_work.elapsed().as_secs_f64();
                     if !self.api_server.borrow().working_nodes.is_empty() {
-                        self.ctx.emit(SchedulerCycle {}, self.id, elapsed_time);
+                        self.ctx.emit(SchedulingCycle {}, self.id, elapsed_time);
                     }
                     elapsed_time += self.sim_config.control_plane_message_delay;
                     self.ctx.emit(PodAssigningFailed { pod },
@@ -67,7 +80,7 @@ impl Scheduler {
 
                 elapsed_time += start_of_algorithm_work.elapsed().as_secs_f64();
                 if !self.api_server.borrow().working_nodes.is_empty() {
-                    self.ctx.emit(SchedulerCycle {}, self.id, elapsed_time);
+                    self.ctx.emit(SchedulingCycle {}, self.id, elapsed_time);
                 }
                 elapsed_time += self.sim_config.control_plane_message_delay;
                 self.ctx.emit(PodAssigningSucceeded { pod, node_id },
@@ -80,7 +93,7 @@ impl Scheduler {
 impl EventHandler for Scheduler {
     fn on(&mut self, event: Event) {
         cast!(match event.data {
-            SchedulerCycle {} => {
+            SchedulingCycle {} => {
                 self.schedule_next_pod();
             }
         })

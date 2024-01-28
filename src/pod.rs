@@ -1,6 +1,7 @@
 //! Representation of the k8s pod
 
 use std::fmt::{Display, Formatter};
+use std::ops::{Deref, DerefMut};
 use std::cmp::Ordering;
 use serde::Serialize;
 

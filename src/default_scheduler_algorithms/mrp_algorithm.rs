@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use crate::node::Node;
 use crate::pod::Pod;
@@ -15,7 +15,7 @@ impl MRPAlgorithm {
 }
 
 impl SchedulerAlgorithm for MRPAlgorithm {
-    fn filter(&self, pod: &Pod, nodes: &HashMap<u32, Rc<RefCell<Node>>>) -> Vec<u32> {
+    fn filter(&self, pod: &Pod, nodes: &BTreeMap<u32, Rc<RefCell<Node>>>) -> Vec<u32> {
         let mut filtered_nodes = Vec::<u32>::default();
         for (node_id, node) in nodes.into_iter() {
             if node.borrow().get_free_cpu() >= pod.requested_cpu &&
@@ -26,7 +26,7 @@ impl SchedulerAlgorithm for MRPAlgorithm {
         filtered_nodes
     }
 
-    fn score(&self, pod: &Pod, nodes: &HashMap<u32, Rc<RefCell<Node>>>,
+    fn score(&self, pod: &Pod, nodes: &BTreeMap<u32, Rc<RefCell<Node>>>,
              filtered_node_ids: &Vec<u32>) -> Vec<f64> {
         let mut scores = Vec::<f64>::default();
         for node_id in filtered_node_ids {
