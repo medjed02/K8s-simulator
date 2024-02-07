@@ -16,6 +16,7 @@ use crate::events::node::NodeStatusChanged;
 use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest,
                                PodPlacementSucceeded, PodPlacementFailed};
 use crate::events::api_server::PodRemoveRequest;
+use crate::events::scheduler::MoveRequest;
 use crate::scheduler::Scheduler;
 
 pub struct APIServer {
@@ -51,6 +52,8 @@ impl APIServer {
     pub fn add_new_node(&mut self, node: Rc<RefCell<Node>>) {
         node.borrow_mut().state = NodeState::Working;
         self.working_nodes.insert(node.borrow().id, node.clone());
+        self.ctx.emit(MoveRequest {}, self.scheduler.clone().unwrap().borrow().id,
+                      self.sim_config.control_plane_message_delay);
     }
 
     /// Recover node from the failed nodes
@@ -130,6 +133,8 @@ impl EventHandler for APIServer {
                 } else {
                     self.remove_node(node_id);
                 }
+                self.ctx.emit(MoveRequest {}, self.scheduler.clone().unwrap().borrow().id,
+                              self.sim_config.control_plane_message_delay);
             }
             PodAssigningRequest { pod } => {
                 self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
@@ -138,8 +143,6 @@ impl EventHandler for APIServer {
                 let node_name = format!("node_{}", node_id);
                 self.ctx.emit(PodPlacementRequest { pod, node_id },
                     self.working_nodes.get(&node_id).unwrap().borrow().id, self.sim_config.message_delay);
-            }
-            PodAssigningFailed { pod } => {
             }
             PodPlacementSucceeded { pod_id, node_id } => {
                 self.pod_to_node_map.insert(pod_id, node_id);

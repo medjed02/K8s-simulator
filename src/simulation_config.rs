@@ -64,6 +64,8 @@ struct RawSimulationConfig {
     pub control_plane_message_delay: Option<f64>,
     pub pod_start_duration: Option<f64>,
     pub pod_stop_duration: Option<f64>,
+    pub pod_initial_backoff_duration: Option<f64>,
+    pub pod_max_backoff_duration: Option<f64>,
     pub nodes: Option<Vec<NodeConfig>>,
     pub pods: Option<Vec<PodConfig>>,
 }
@@ -79,6 +81,10 @@ pub struct SimulationConfig {
     pub pod_start_duration: f64,
     /// Pod stop duration in seconds.
     pub pod_stop_duration: f64,
+    /// Initial backoff duration for scheduler
+    pub pod_initial_backoff_duration: f64,
+    /// Max backoff duration for scheduler
+    pub pod_max_backoff_duration: f64,
     /// Configurations of nodes.
     pub nodes: Vec<NodeConfig>,
     /// Configurations of pods.
@@ -87,12 +93,15 @@ pub struct SimulationConfig {
 
 impl SimulationConfig {
     pub fn new(message_delay: f64, control_plane_message_delay: f64, pod_start_duration: f64,
-               pod_stop_duration: f64) -> Self {
+               pod_stop_duration: f64, pod_initial_backoff_duration: f64,
+               pod_max_backoff_duration: f64) -> Self {
         Self {
             message_delay,
             control_plane_message_delay,
             pod_start_duration,
             pod_stop_duration,
+            pod_initial_backoff_duration,
+            pod_max_backoff_duration,
             nodes: Vec::default(),
             pods: Vec::default(),
         }
@@ -108,6 +117,8 @@ impl SimulationConfig {
             control_plane_message_delay: raw.control_plane_message_delay.unwrap_or(0.0),
             pod_start_duration: raw.pod_start_duration.unwrap_or(5.0),
             pod_stop_duration: raw.pod_stop_duration.unwrap_or(5.0),
+            pod_initial_backoff_duration: raw.pod_initial_backoff_duration.unwrap_or(1.0),
+            pod_max_backoff_duration: raw.pod_max_backoff_duration.unwrap_or(10.0),
             nodes: raw.nodes.unwrap_or_default(),
             pods: raw.pods.unwrap_or_default(),
         }

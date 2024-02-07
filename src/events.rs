@@ -19,6 +19,7 @@ pub mod assigning {
     #[derive(Clone, Serialize)]
     pub struct PodAssigningFailed {
         pub pod: Pod,
+        pub scheduling_cycle: i64,
     }
 
     #[derive(Clone, Serialize)]
@@ -74,8 +75,23 @@ pub mod node {
 // SCHEDULER'S WORK EVENTS //
 pub mod scheduler {
     use serde::Serialize;
+    use crate::pod::Pod;
+
     #[derive(Clone, Serialize)]
     pub struct SchedulingCycle {
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct PodBackoffRetry {
+        pub pod: Pod,
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct FlushUnschedulableQueue {
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct MoveRequest {
     }
 }
 

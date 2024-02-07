@@ -36,6 +36,8 @@ pub struct Pod {
     pub limit_cpu: f32,
     pub limit_memory: f64,
     pub priority_weight: u64,
+    pub scheduling_attempts: Option<u64>,
+    pub scheduling_timestamp: Option<f64>,
     pub status: PodStatus,
 }
 
@@ -56,6 +58,8 @@ impl Pod {
             limit_cpu,
             limit_memory,
             priority_weight,
+            scheduling_attempts: None,
+            scheduling_timestamp: None,
             status,
         }
     }

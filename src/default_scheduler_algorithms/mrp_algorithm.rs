@@ -30,10 +30,10 @@ impl SchedulerAlgorithm for MRPAlgorithm {
              filtered_node_ids: &Vec<u32>) -> Vec<f64> {
         let mut scores = Vec::<f64>::default();
         for node_id in filtered_node_ids {
-            let mut score = 10.0 * (1.0 - nodes.get(node_id).unwrap().borrow().get_cpu_utilization());
-            score += 10.0 * (1.0 - nodes.get(node_id).unwrap().borrow().get_memory_utilization());
-            score /= 2.0;
-            scores.push(score);
+            let node = nodes.get(node_id).unwrap().borrow();
+            let cpu_utilization = ((node.cpu_load + pod.requested_cpu) as f64) / (node.cpu_total as f64);
+            let memory_utilization = (node.memory_load + pod.requested_memory) / (node.memory_total as f64);
+            scores.push(10.0 * (cpu_utilization + memory_utilization) / 2.0);
         }
         scores
     }
