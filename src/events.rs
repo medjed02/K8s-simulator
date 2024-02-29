@@ -66,6 +66,16 @@ pub mod node {
     use crate::node::{NodeState};
 
     #[derive(Clone, Serialize)]
+    pub struct AllocateNewDefaultNodes {
+        pub cnt_nodes: u32,
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct RemoveNode {
+        pub node_id: u32,
+    }
+
+    #[derive(Clone, Serialize)]
     pub struct NodeStatusChanged {
         pub node_id: u32,
         pub new_status: NodeState,
@@ -102,5 +112,13 @@ pub mod api_server {
     #[derive(Clone, Serialize)]
     pub struct PodRemoveRequest {
         pub pod_id: u64,
+    }
+}
+
+pub mod autoscaler {
+    use serde::Serialize;
+
+    #[derive(Clone, Serialize)]
+    pub struct ClusterAutoscalerScan {
     }
 }

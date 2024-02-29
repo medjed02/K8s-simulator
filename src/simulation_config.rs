@@ -64,8 +64,12 @@ struct RawSimulationConfig {
     pub control_plane_message_delay: Option<f64>,
     pub pod_start_duration: Option<f64>,
     pub pod_stop_duration: Option<f64>,
+    pub node_stop_duration: Option<f64>,
     pub pod_initial_backoff_duration: Option<f64>,
     pub pod_max_backoff_duration: Option<f64>,
+    pub cluster_autoscaler_scan_interval: Option<f64>,
+    pub default_node: Option<NodeConfig>,
+    pub default_node_allocation_time: Option<f64>,
     pub nodes: Option<Vec<NodeConfig>>,
     pub pods: Option<Vec<PodConfig>>,
 }
@@ -81,10 +85,18 @@ pub struct SimulationConfig {
     pub pod_start_duration: f64,
     /// Pod stop duration in seconds.
     pub pod_stop_duration: f64,
+    /// Node stop duration in seconds
+    pub node_stop_duration: f64,
     /// Initial backoff duration for scheduler
     pub pod_initial_backoff_duration: f64,
     /// Max backoff duration for scheduler
     pub pod_max_backoff_duration: f64,
+    /// Scan interval for cluster autoscaler in seconds
+    pub cluster_autoscaler_scan_interval: f64,
+    /// Configuration of default pod (for cluster autoscaler)
+    pub default_node: NodeConfig,
+    /// Time of allocation of new node (for cluster autoscaler)
+    pub default_node_allocation_time: f64,
     /// Configurations of nodes.
     pub nodes: Vec<NodeConfig>,
     /// Configurations of pods.
@@ -100,8 +112,12 @@ impl SimulationConfig {
             control_plane_message_delay,
             pod_start_duration,
             pod_stop_duration,
+            node_stop_duration: 30.0,
             pod_initial_backoff_duration,
             pod_max_backoff_duration,
+            cluster_autoscaler_scan_interval: 10.0,
+            default_node: NodeConfig::new(8, 64, 1),
+            default_node_allocation_time: 120.0,
             nodes: Vec::default(),
             pods: Vec::default(),
         }
@@ -117,8 +133,12 @@ impl SimulationConfig {
             control_plane_message_delay: raw.control_plane_message_delay.unwrap_or(0.0),
             pod_start_duration: raw.pod_start_duration.unwrap_or(5.0),
             pod_stop_duration: raw.pod_stop_duration.unwrap_or(5.0),
+            node_stop_duration: raw.node_stop_duration.unwrap_or(30.0),
             pod_initial_backoff_duration: raw.pod_initial_backoff_duration.unwrap_or(1.0),
             pod_max_backoff_duration: raw.pod_max_backoff_duration.unwrap_or(10.0),
+            cluster_autoscaler_scan_interval: raw.cluster_autoscaler_scan_interval.unwrap_or(10.0),
+            default_node: raw.default_node.unwrap_or(NodeConfig::new(8, 64, 1)),
+            default_node_allocation_time: raw.default_node_allocation_time.unwrap_or(120.0),
             nodes: raw.nodes.unwrap_or_default(),
             pods: raw.pods.unwrap_or_default(),
         }

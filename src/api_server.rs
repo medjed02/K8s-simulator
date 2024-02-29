@@ -1,7 +1,7 @@
 //! Representation of the k8s API server
 
 use std::cell::RefCell;
-use std::collections::{BinaryHeap, BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap};
 use std::hash::Hash;
 use std::rc::Rc;
 use dslab_core::cast;
@@ -12,7 +12,7 @@ use dslab_core::handler::EventHandler;
 use crate::node::{Node, NodeState};
 use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
-use crate::events::node::NodeStatusChanged;
+use crate::events::node::{AllocateNewDefaultNodes, NodeStatusChanged, RemoveNode};
 use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest,
                                PodPlacementSucceeded, PodPlacementFailed};
 use crate::events::api_server::PodRemoveRequest;
@@ -63,8 +63,17 @@ impl APIServer {
         self.working_nodes.insert(node_id, node);
     }
 
-    /// Remove node from the working nodes (maybe crash old node, maybe horizontal autoscaling)
+    /// Remove node from cluster (from working nodes)
     pub fn remove_node(&mut self, node_id: u32) {
+        let node = self.working_nodes.remove(&node_id).unwrap();
+        let node = node.borrow_mut();
+        for (_, pod) in node.pods.clone().into_iter() {
+            self.ctx.emit(PodAssigningRequest { pod }, self.id, 0.0);
+        }
+    }
+
+    /// Crash node (from working nodes)
+    pub fn crash_node(&mut self, node_id: u32) {
         let node = self.working_nodes.remove(&node_id).unwrap();
         let mut mut_node = node.borrow_mut();
         for (pod_id, pod) in mut_node.pods.clone().into_iter() {
@@ -106,8 +115,8 @@ impl APIServer {
         let mut sum_cpu_load: f64 = 0.0;
         let mut sum_cpu_total: f64 = 0.0;
         for (node_id, node) in self.working_nodes.iter() {
-            sum_cpu_load += (node.borrow().cpu_load as f64);
-            sum_cpu_total += (node.borrow().cpu_total as f64)
+            sum_cpu_load += node.borrow().cpu_load as f64;
+            sum_cpu_total += node.borrow().cpu_total as f64
         }
         sum_cpu_load / sum_cpu_total
     }
@@ -116,9 +125,9 @@ impl APIServer {
     pub fn memory_load_rate(&self) -> f64 {
         let mut sum_memory_load: f64 = 0.0;
         let mut sum_memory_total: f64 = 0.0;
-        for (node_id, node) in self.working_nodes.iter() {
-            sum_memory_load += (node.borrow().memory_load as f64);
-            sum_memory_total += (node.borrow().memory_total as f64)
+        for (_, node) in self.working_nodes.iter() {
+            sum_memory_load += node.borrow().memory_load;
+            sum_memory_total += node.borrow().memory_total as f64
         }
         sum_memory_load / sum_memory_total
     }
@@ -154,6 +163,9 @@ impl EventHandler for APIServer {
                 if node_id.is_some() {
                     self.working_nodes.get(node_id.unwrap()).unwrap().borrow_mut().remove_pod(pod_id);
                 }
+            }
+            RemoveNode { node_id } => {
+                self.remove_node(node_id);
             }
         })
     }

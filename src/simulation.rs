@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
 use dslab_core::context::SimulationContext;
+use dslab_core::{cast, Event, EventHandler};
 use dslab_core::simulation::Simulation;
 use crate::api_server::APIServer;
 use crate::scheduler::Scheduler;
@@ -10,7 +11,7 @@ use sugars::{rc, refcell};
 use crate::default_scheduler_algorithms::mrp_algorithm::MRPAlgorithm;
 use crate::events::api_server::PodRemoveRequest;
 use crate::events::assigning::PodAssigningRequest;
-use crate::events::node::NodeStatusChanged;
+use crate::events::node::{AllocateNewDefaultNodes, NodeStatusChanged};
 use crate::node::{Node, NodeState};
 use crate::pod::{Pod, PodStatus};
 use crate::scheduler_algorithm::SchedulerAlgorithm;
@@ -178,5 +179,18 @@ impl K8sSimulation {
     /// Returns the current simulation time.
     pub fn current_time(&self) -> f64 {
         self.sim.time()
+    }
+}
+
+impl EventHandler for K8sSimulation {
+    fn on(&mut self, event: Event) {
+        cast!(match event.data {
+            AllocateNewDefaultNodes { cnt_nodes } => {
+                for _ in 0..cnt_nodes {
+                    self.add_node(self.sim_config.default_node.cpu,
+                        self.sim_config.default_node.memory);
+                }
+            }
+        })
     }
 }
