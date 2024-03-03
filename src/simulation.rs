@@ -8,9 +8,13 @@ use crate::api_server::APIServer;
 use crate::scheduler::Scheduler;
 use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
+use crate::cluster_autoscaler::ClusterAutoscaler;
+use crate::cluster_autoscaler_algorithm::ClusterAutoscalerAlgorithm;
+use crate::default_cluster_autoscaler_algorithms::default_simple_algorithm::SimpleClusterAutoscalerAlgorithm;
 use crate::default_scheduler_algorithms::mrp_algorithm::MRPAlgorithm;
 use crate::events::api_server::PodRemoveRequest;
 use crate::events::assigning::PodAssigningRequest;
+use crate::events::autoscaler::ClusterAutoscalerScan;
 use crate::events::node::{AllocateNewDefaultNodes, NodeStatusChanged};
 use crate::node::{Node, NodeState};
 use crate::pod::{Pod, PodStatus};
@@ -19,6 +23,7 @@ use crate::scheduler_algorithm::SchedulerAlgorithm;
 pub struct K8sSimulation {
     scheduler: Rc<RefCell<Scheduler>>,
     api_server: Rc<RefCell<APIServer>>,
+    cluster_autoscaler: Rc<RefCell<ClusterAutoscaler>>,
     
     sim: Simulation,
     ctx: SimulationContext,
@@ -31,7 +36,9 @@ pub struct K8sSimulation {
 impl K8sSimulation {
     /// Creates a simulation with specified config.
     pub fn new(mut sim: Simulation, sim_config: SimulationConfig,
-               scheduler_algorithm: Box<dyn SchedulerAlgorithm>) -> Self {
+               scheduler_algorithm: Box<dyn SchedulerAlgorithm>,
+               cluster_autoscaler_algorithm: Box<dyn ClusterAutoscalerAlgorithm>,
+               cluster_autoscaler_on: bool, cloud_nodes_count: u32) -> Self {
         let sim_config = rc!(sim_config);
 
         let api_server = rc!(refcell!(
@@ -39,22 +46,45 @@ impl K8sSimulation {
         ));
         sim.add_handler("api_server", api_server.clone());
 
+        let scheduler = rc!(refcell!(Scheduler::new(api_server.clone(), scheduler_algorithm,
+                sim.create_context("scheduler"), sim_config.clone())));
+        sim.add_handler("scheduler", scheduler.clone());
+        {
+            api_server.borrow_mut().set_scheduler(scheduler.clone());
+        }
+
         let ctx = sim.create_context("simulation");
+
+        let mut cloud_nodes_pool = Vec::<Rc<RefCell<Node>>>::default();
+        if cluster_autoscaler_on {
+            for i in 0..cloud_nodes_count {
+                let name = format!("cloud_node_{}", i);
+                let node_ctx = sim.create_context(&name);
+                let cpu = sim_config.default_node.cpu;
+                let memory = sim_config.default_node.memory;
+                let node = rc!(refcell!(Node::new(cpu, memory, 0.0, 0.0,
+                    NodeState::Working, api_server.clone(), node_ctx, sim_config.clone())));
+                cloud_nodes_pool.push(node.clone());
+                sim.add_handler(name, node.clone());
+            }
+        }
+        let cluster_ctx = sim.create_context("cluster_autoscaler");
+        let cluster_autoscaler = rc!(refcell!(ClusterAutoscaler::new(
+            cloud_nodes_pool, api_server.clone(), scheduler.clone(),
+            cluster_autoscaler_algorithm, cluster_ctx, sim_config.clone()
+        )));
+        sim.add_handler("cluster_autoscaler", cluster_autoscaler.clone());
+
         let mut sim = Self {
-            scheduler: rc!(refcell!(Scheduler::new(api_server.clone(), scheduler_algorithm,
-                sim.create_context("scheduler"), sim_config.clone()))),
+            scheduler,
             api_server,
+            cluster_autoscaler,
             sim,
             ctx,
             sim_config,
             last_pod_id: 0,
             last_node_id: 0
         };
-
-        sim.sim.add_handler("scheduler", sim.scheduler.clone());
-        {
-            sim.api_server.borrow_mut().set_scheduler(sim.scheduler.clone());
-        }
 
         for node_config in sim.sim_config.nodes.clone() {
             for i in 0..node_config.count {
@@ -67,6 +97,11 @@ impl K8sSimulation {
                 sim.submit_pod(pod_config.requested_cpu, pod_config.requested_memory, pod_config.limit_cpu,
                                pod_config.limit_memory, pod_config.priority_weight, pod_config.submit_time);
             }
+        }
+
+        if cluster_autoscaler_on {
+            // Launch cluster autoscaler
+            sim.ctx.emit(ClusterAutoscalerScan{}, sim.cluster_autoscaler.borrow().id, 0.0);
         }
 
         sim
@@ -90,7 +125,7 @@ impl K8sSimulation {
                       self.api_server.borrow().id, self.sim_config.control_plane_message_delay + delay);
     }
 
-    pub fn remove_node(&self, node_id: u32, delay: f64) {
+    pub fn crash_node(&self, node_id: u32, delay: f64) {
         self.ctx.emit(NodeStatusChanged { node_id, new_status: NodeState::Failed },
                       self.api_server.borrow().id, self.sim_config.control_plane_message_delay + delay);
     }
@@ -179,18 +214,5 @@ impl K8sSimulation {
     /// Returns the current simulation time.
     pub fn current_time(&self) -> f64 {
         self.sim.time()
-    }
-}
-
-impl EventHandler for K8sSimulation {
-    fn on(&mut self, event: Event) {
-        cast!(match event.data {
-            AllocateNewDefaultNodes { cnt_nodes } => {
-                for _ in 0..cnt_nodes {
-                    self.add_node(self.sim_config.default_node.cpu,
-                        self.sim_config.default_node.memory);
-                }
-            }
-        })
     }
 }

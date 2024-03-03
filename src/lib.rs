@@ -9,5 +9,6 @@ pub mod simulation_config;
 pub mod experiment_config;
 pub mod scheduler_algorithm;
 pub mod default_scheduler_algorithms;
-mod cluster_autoscaler;
-mod cluster_autoscaler_algorithm;
+pub mod cluster_autoscaler;
+pub mod cluster_autoscaler_algorithm;
+pub mod default_cluster_autoscaler_algorithms;

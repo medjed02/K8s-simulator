@@ -109,7 +109,7 @@ impl Scheduler {
     }
 
     pub fn add_pod_to_unschedulable(&mut self, mut pod: Pod, scheduling_cycle: i64) {
-        if self.moving_cycle >= scheduling_cycle {
+        if self.moving_cycle < scheduling_cycle {
             pod.scheduling_timestamp = Some(self.ctx.time());
             self.unschedulable_queue.push(pod);
         } else {
@@ -129,20 +129,41 @@ impl Scheduler {
         duration
     }
 
-    pub fn move_unschedulable_to_active_or_backoff(&mut self) {
-        let mut new_unschedulable_queue = Vec::<Pod>::default();
-        while !self.unschedulable_queue.is_empty() {
-            let pod = self.unschedulable_queue.pop().unwrap();
-            if self.ctx.time() - pod.scheduling_timestamp.unwrap() < POD_MIN_UNSCHEDULABLE_TIMEOUT {
-                new_unschedulable_queue.push(pod);
-            } else if self.ctx.time() - pod.scheduling_timestamp.unwrap() < self.calculate_backoff_duration(&pod) {
+    pub fn move_pods_to_active_or_backoff(&mut self, mut pods: Vec<Pod>) {
+        while !pods.is_empty() {
+            let pod = pods.pop().unwrap();
+            if self.ctx.time() - pod.scheduling_timestamp.unwrap() < self.calculate_backoff_duration(&pod) {
                 let left_backoff_duration = self.calculate_backoff_duration(&pod) - self.ctx.time() + pod.scheduling_timestamp.unwrap();
                 self.ctx.emit(PodBackoffRetry { pod }, self.id, left_backoff_duration);
             } else {
                 self.add_pod(pod);
             }
         }
+        self.moving_cycle = self.scheduling_cycle;
+    }
+
+    pub fn flush_unschedulable_queue(&mut self) {
+        let mut new_unschedulable_queue = Vec::<Pod>::default();
+        let mut pods_to_flush = Vec::<Pod>::default();
+        while !self.unschedulable_queue.is_empty() {
+            let pod = self.unschedulable_queue.pop().unwrap();
+            if self.ctx.time() - pod.scheduling_timestamp.unwrap() < POD_MIN_UNSCHEDULABLE_TIMEOUT {
+                new_unschedulable_queue.push(pod);
+            } else {
+                pods_to_flush.push(pod);
+            }
+        }
         self.unschedulable_queue = new_unschedulable_queue;
+        self.move_pods_to_active_or_backoff(pods_to_flush);
+    }
+
+    pub fn move_all_to_active_or_backoff(&mut self) {
+        let mut pods_to_move = Vec::<Pod>::default();
+        while !self.unschedulable_queue.is_empty() {
+            let pod = self.unschedulable_queue.pop().unwrap();
+            pods_to_move.push(pod);
+        }
+        self.move_pods_to_active_or_backoff(pods_to_move);
     }
 
 }
@@ -161,11 +182,10 @@ impl EventHandler for Scheduler {
             }
             FlushUnschedulableQueue {} => {
                 self.ctx.emit(FlushUnschedulableQueue {}, self.id, UNSCHEDULABLE_QUEUE_FLUSH_TIMEOUT);
-                self.move_unschedulable_to_active_or_backoff();
+                self.flush_unschedulable_queue();
             }
             MoveRequest {} => {
-                self.moving_cycle = self.scheduling_cycle;
-                self.move_unschedulable_to_active_or_backoff();
+                self.move_all_to_active_or_backoff();
             }
         })
     }

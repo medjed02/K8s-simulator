@@ -140,7 +140,7 @@ impl EventHandler for APIServer {
                 if new_status == NodeState::Working {
                     self.recover_node(node_id);
                 } else {
-                    self.remove_node(node_id);
+                    self.crash_node(node_id);
                 }
                 self.ctx.emit(MoveRequest {}, self.scheduler.clone().unwrap().borrow().id,
                               self.sim_config.control_plane_message_delay);
