@@ -31,6 +31,8 @@ impl Display for PodStatus {
 #[derive(Clone, Serialize)]
 pub struct Pod {
     pub id: u64,
+    pub cpu: f32,
+    pub memory: f64,
     pub requested_cpu: f32,
     pub requested_memory: f64,
     pub limit_cpu: f32,
@@ -53,6 +55,8 @@ impl Pod {
     ) -> Self {
         Self {
             id,
+            cpu: 0.0,
+            memory: 0.0,
             requested_cpu,
             requested_memory,
             limit_cpu,

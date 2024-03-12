@@ -70,6 +70,8 @@ struct RawSimulationConfig {
     pub cluster_autoscaler_scan_interval: Option<f64>,
     pub default_node: Option<NodeConfig>,
     pub default_node_allocation_time: Option<f64>,
+    pub metrics_server_interval: Option<f64>,
+    pub vpa_interval: Option<f64>,
     pub nodes: Option<Vec<NodeConfig>>,
     pub pods: Option<Vec<PodConfig>>,
 }
@@ -97,6 +99,10 @@ pub struct SimulationConfig {
     pub default_node: NodeConfig,
     /// Time of allocation of new node (for cluster autoscaler)
     pub default_node_allocation_time: f64,
+    /// Time of metrics server's interval
+    pub metrics_server_interval: f64,
+    /// Time of VPA interval
+    pub vpa_interval: f64,
     /// Configurations of nodes.
     pub nodes: Vec<NodeConfig>,
     /// Configurations of pods.
@@ -118,6 +124,8 @@ impl SimulationConfig {
             cluster_autoscaler_scan_interval: 10.0,
             default_node: NodeConfig::new(8, 64, 1),
             default_node_allocation_time: 120.0,
+            metrics_server_interval: 30.0,
+            vpa_interval: 30.0,
             nodes: Vec::default(),
             pods: Vec::default(),
         }
@@ -139,6 +147,8 @@ impl SimulationConfig {
             cluster_autoscaler_scan_interval: raw.cluster_autoscaler_scan_interval.unwrap_or(10.0),
             default_node: raw.default_node.unwrap_or(NodeConfig::new(8, 64, 1)),
             default_node_allocation_time: raw.default_node_allocation_time.unwrap_or(120.0),
+            metrics_server_interval: raw.metrics_server_interval.unwrap_or(30.0),
+            vpa_interval: raw.vpa_interval.unwrap_or(30.0),
             nodes: raw.nodes.unwrap_or_default(),
             pods: raw.pods.unwrap_or_default(),
         }

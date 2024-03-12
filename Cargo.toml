@@ -6,6 +6,7 @@ edition = "2021"
 
 [dependencies]
 dslab-core = { git = "https://github.com/osukhoroslov/dslab.git" }
+order-stat = "0.1"
 rand = "0.8.5"
 log = "0.4.20"
 sugars = "3.0.0"

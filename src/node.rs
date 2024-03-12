@@ -84,12 +84,16 @@ impl Node {
         self.get_free_memory() / (self.memory_total as f64)
     }
 
-    pub fn add_pod(&mut self, pod: Pod) -> bool {
+    pub fn add_pod(&mut self, mut pod: Pod) -> bool {
         if self.get_free_cpu() < pod.requested_cpu || self.get_free_memory() < pod.requested_memory {
             return false;
         }
         self.cpu_load += pod.requested_cpu;
         self.memory_load += pod.requested_memory;
+
+        pod.cpu = pod.requested_cpu;
+        pod.memory = pod.requested_memory;
+
         self.pods.insert(pod.id, pod);
         true
     }
@@ -97,7 +101,11 @@ impl Node {
     pub fn remove_pod(&mut self, pod_id: u64) -> Pod {
         self.cpu_load -= self.pods.get(&pod_id).unwrap().requested_cpu;
         self.memory_load -= self.pods.get(&pod_id).unwrap().requested_memory;
-        self.pods.remove(&pod_id).unwrap()
+
+        let mut pod = self.pods.remove(&pod_id).unwrap();
+        pod.cpu = 0.0;
+        pod.memory = 0.0;
+        pod
     }
 }
 

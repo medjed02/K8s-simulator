@@ -60,6 +60,27 @@ pub mod assigning {
     }
 }
 
+// POD EVENTS //
+pub mod pod {
+    use serde::Serialize;
+
+    #[derive(Clone, Serialize)]
+    pub struct PodResourceChange {
+        pub pod_id: u64,
+        pub new_cpu: f32,
+        pub new_memory: f64,
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct PodRequestAndLimitsChange {
+        pub pod_id: u64,
+        pub new_requested_cpu: f32,
+        pub new_limit_cpu: f32,
+        pub new_requested_memory: f64,
+        pub new_limit_memory: f64,
+    }
+}
+
 // NODE CHANGING STATUS EVENTS //
 pub mod node {
     use serde::Serialize;
@@ -120,5 +141,13 @@ pub mod autoscaler {
 
     #[derive(Clone, Serialize)]
     pub struct ClusterAutoscalerScan {
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct MetricsServerSnapshot {
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct VerticalAutoscalerCycle {
     }
 }

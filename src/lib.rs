@@ -12,3 +12,6 @@ pub mod default_scheduler_algorithms;
 pub mod cluster_autoscaler;
 pub mod cluster_autoscaler_algorithm;
 pub mod default_cluster_autoscaler_algorithms;
+mod metrics_server;
+mod vertical_autoscaler;
+mod vertical_autoscaler_algorithm;
