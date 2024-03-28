@@ -34,14 +34,32 @@ impl VerticalAutoscaler {
 
     fn collect_recommendations(&mut self) -> Vec<VPARecommendation> {
         let mut recommendations = Vec::<VPARecommendation>::default();
-        let pod_ids = self.api_server.borrow().pod_to_node_map.keys();
-        for pod_id in pod_ids {
-            let snapshot_history = self.metrics_server.borrow().get_pod_snapshot_history(*pod_id);
-            if snapshot_history.is_none() {
+        for pod_id in self.api_server.borrow().pod_to_node_map.keys() {
+            let statistic = self.metrics_server.borrow().get_pod_statistics(*pod_id);
+            if statistic.is_none() {
                 continue;
             }
-            let snapshot_history = snapshot_history.unwrap();
-            let recommendation = self.vpa_algorithm.get_recommendation(*pod_id, snapshot_history);
+            let statistic = statistic.unwrap();
+
+            let api_server = self.api_server.borrow();
+            let node_id = api_server.pod_to_node_map.get(pod_id);
+            if node_id.is_none() {
+                continue;
+            }
+            let node_id = node_id.unwrap();
+            let node = api_server.working_nodes.get(&node_id);
+            if node.is_none() {
+                continue;
+            }
+            let node = node.unwrap().borrow();
+
+            let pod = node.pods.get(pod_id);
+            if pod.is_none() {
+                continue;
+            }
+            let pod = pod.unwrap();
+
+            let recommendation = self.vpa_algorithm.get_recommendation(pod, statistic);
             if recommendation.is_some() {
                 recommendations.push(recommendation.unwrap());
             }
@@ -51,21 +69,25 @@ impl VerticalAutoscaler {
 
     fn try_to_apply_recommendations(&mut self, recommendations: Vec<VPARecommendation>) {
         for recommendation in recommendations {
-            let node_id = self.api_server.borrow().pod_to_node_map.get(&recommendation.pod_id);
+            let api_server = self.api_server.borrow();
+            let node_id = api_server.pod_to_node_map.get(&recommendation.pod_id);
             if node_id.is_none() {
                 continue;
             }
             let node_id = node_id.unwrap();
-            let node = self.api_server.borrow().working_nodes.get(&node_id);
+            let node = api_server.working_nodes.get(&node_id);
             if node.is_none() {
                 continue;
             }
             let node = node.unwrap();
-            let pod = node.borrow().pods.get(&recommendation.pod_id);
+            let borrowed_node = node.borrow();
+
+            let pod = borrowed_node.pods.get(&recommendation.pod_id);
             if pod.is_none() {
                 continue;
             }
             let pod = pod.unwrap();
+
             if self.vpa_algorithm.try_to_apply_recommendation(pod, node, recommendation) {
                 self.ctx.emit(PodRequestAndLimitsChange {
                     pod_id: recommendation.pod_id,
@@ -73,7 +95,7 @@ impl VerticalAutoscaler {
                     new_limit_cpu: recommendation.new_limit_cpu,
                     new_requested_memory: recommendation.new_requested_memory,
                     new_limit_memory: recommendation.new_limit_memory
-                }, *node_id, self.sim_config.message_delay * 2);
+                }, *node_id, self.sim_config.message_delay * 2.0);
             }
         }
     }

@@ -36,7 +36,7 @@ pub mod assigning {
 
     #[derive(Clone, Serialize)]
     pub struct PodPlacementFailed {
-        pub pod_id: u64,
+        pub pod: Pod,
         pub node_id: u32,
     }
 
@@ -100,6 +100,10 @@ pub mod node {
     pub struct NodeStatusChanged {
         pub node_id: u32,
         pub new_status: NodeState,
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct UpdatePodsResources {
     }
 }
 

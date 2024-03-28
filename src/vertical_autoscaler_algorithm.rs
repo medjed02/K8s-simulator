@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
-use crate::metrics_server::PodSnapshot;
+use crate::metrics_server::{PodSnapshot, PodStatistic};
 use crate::node::Node;
 use crate::pod::Pod;
 
@@ -14,8 +14,7 @@ pub struct VPARecommendation {
 }
 
 pub trait VerticalAutoscalerAlgorithm {
-    fn get_recommendation(&mut self, pod_id: u64,
-                          pod_snapshot_history: Vec<PodSnapshot>) -> Option<VPARecommendation>;
+    fn get_recommendation(&mut self, pod: &Pod, pod_statistic: PodStatistic) -> Option<VPARecommendation>;
 
     fn try_to_apply_recommendation(&mut self, pod: &Pod, node: &Rc<RefCell<Node>>,
                                    recommendation: VPARecommendation) -> bool;

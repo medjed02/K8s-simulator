@@ -156,7 +156,8 @@ impl EventHandler for APIServer {
             PodPlacementSucceeded { pod_id, node_id } => {
                 self.pod_to_node_map.insert(pod_id, node_id);
             }
-            PodPlacementFailed { pod_id, node_id } => {
+            PodPlacementFailed { pod, node_id } => {
+                self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
             }
             PodRemoveRequest { pod_id } => {
                 let node_id = self.pod_to_node_map.get(&pod_id);

@@ -1,9 +1,9 @@
 //! Representation of the k8s pod
 
 use std::fmt::{Display, Formatter};
-use std::ops::{Deref, DerefMut};
 use std::cmp::Ordering;
 use serde::Serialize;
+use crate::load_model::LoadModel;
 
 
 /// Pod status
@@ -31,21 +31,30 @@ impl Display for PodStatus {
 #[derive(Clone, Serialize)]
 pub struct Pod {
     pub id: u64,
+
     pub cpu: f32,
     pub memory: f64,
+    pub cpu_load_model: Box<dyn LoadModel>,
+    pub memory_load_model: Box<dyn LoadModel>,
+
     pub requested_cpu: f32,
     pub requested_memory: f64,
     pub limit_cpu: f32,
     pub limit_memory: f64,
     pub priority_weight: u64,
+
     pub scheduling_attempts: Option<u64>,
     pub scheduling_timestamp: Option<f64>,
+
+    pub start_time: f64,
     pub status: PodStatus,
 }
 
 impl Pod {
     pub fn new(
         id: u64,
+        cpu_load_model: Box<dyn LoadModel>,
+        memory_load_model: Box<dyn LoadModel>,
         requested_cpu: f32,
         requested_memory: f64,
         limit_cpu: f32,
@@ -57,6 +66,8 @@ impl Pod {
             id,
             cpu: 0.0,
             memory: 0.0,
+            cpu_load_model,
+            memory_load_model,
             requested_cpu,
             requested_memory,
             limit_cpu,
@@ -64,8 +75,16 @@ impl Pod {
             priority_weight,
             scheduling_attempts: None,
             scheduling_timestamp: None,
+            start_time: 0.0,
             status,
         }
+    }
+    pub fn get_wanted_cpu(&self, time: f64) -> f64 {
+        self.cpu_load_model.get_resource(time, time - self.start_time)
+    }
+
+    pub fn get_wanted_memory(&self, time: f64) -> f64 {
+        self.memory_load_model.get_resource(time, time - self.start_time)
     }
 }
 
