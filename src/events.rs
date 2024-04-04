@@ -81,6 +81,23 @@ pub mod pod {
     }
 }
 
+// DEPLOYMENT EVENTS //
+pub mod deployment {
+    use serde::Serialize;
+    use crate::deployment::Deployment;
+
+    #[derive(Clone, Serialize)]
+    pub struct DeploymentCreateRequest {
+        pub deployment: Deployment,
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct DeploymentHorizontalAutoscaling {
+        pub id: u64,
+        pub new_cnt_replicas: u64,
+    }
+}
+
 // NODE CHANGING STATUS EVENTS //
 pub mod node {
     use serde::Serialize;
@@ -153,5 +170,9 @@ pub mod autoscaler {
 
     #[derive(Clone, Serialize)]
     pub struct VerticalAutoscalerCycle {
+    }
+
+    #[derive(Clone, Serialize)]
+    pub struct HorizontalAutoscalerCycle {
     }
 }

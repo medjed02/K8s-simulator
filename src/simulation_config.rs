@@ -73,6 +73,7 @@ struct RawSimulationConfig {
     pub cloud_nodes_count: Option<u64>,
     pub metrics_server_interval: Option<f64>,
     pub vpa_interval: Option<f64>,
+    pub hpa_interval: Option<f64>,
     pub nodes: Option<Vec<NodeConfig>>,
 }
 
@@ -105,6 +106,8 @@ pub struct SimulationConfig {
     pub metrics_server_interval: f64,
     /// Time of VPA interval
     pub vpa_interval: f64,
+    /// Time of HPA interval
+    pub hpa_interval: f64,
     /// Configurations of nodes.
     pub nodes: Vec<NodeConfig>,
 }
@@ -127,6 +130,7 @@ impl SimulationConfig {
             cloud_nodes_count: 100,
             metrics_server_interval: 30.0,
             vpa_interval: 30.0,
+            hpa_interval: 30.0,
             nodes: Vec::default(),
         }
     }
@@ -150,6 +154,7 @@ impl SimulationConfig {
             cloud_nodes_count: raw.cloud_nodes_count.unwrap_or(100),
             metrics_server_interval: raw.metrics_server_interval.unwrap_or(30.0),
             vpa_interval: raw.vpa_interval.unwrap_or(30.0),
+            hpa_interval: raw.hpa_interval.unwrap_or(30.0),
             nodes: raw.nodes.unwrap_or_default()
         }
     }

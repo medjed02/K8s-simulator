@@ -17,3 +17,7 @@ pub mod vertical_autoscaler;
 pub mod vertical_autoscaler_algorithm;
 pub mod load_model;
 pub mod default_vertical_autoscaler_algorithms;
+pub mod deployment;
+pub mod horizontal_autoscaler;
+pub mod horizontal_autoscaler_algorithm;
+pub mod default_horizontal_autoscaler_algorithms;

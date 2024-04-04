@@ -12,10 +12,11 @@ use dslab_core::handler::EventHandler;
 use crate::node::{Node, NodeState};
 use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
+use crate::deployment::Deployment;
 use crate::events::node::{AllocateNewDefaultNodes, NodeStatusChanged, RemoveNode};
-use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest,
-                               PodPlacementSucceeded, PodPlacementFailed};
+use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest, PodPlacementSucceeded, PodPlacementFailed};
 use crate::events::api_server::PodRemoveRequest;
+use crate::events::deployment::{DeploymentCreateRequest, DeploymentHorizontalAutoscaling};
 use crate::events::scheduler::MoveRequest;
 use crate::scheduler::Scheduler;
 
@@ -24,10 +25,15 @@ pub struct APIServer {
     pub working_nodes: BTreeMap<u32, Rc<RefCell<Node>>>,
     pub failed_nodes: BTreeMap<u32, Rc<RefCell<Node>>>,
     pub pod_to_node_map: HashMap<u64, u32>,
+    pub deployment_to_replicas: HashMap<Deployment, Vec<u64>>,
+    pub deployments: HashMap<u64, Deployment>,
     scheduler: Option<Rc<RefCell<Scheduler>>>,
 
     ctx: SimulationContext,
     sim_config: Rc<SimulationConfig>,
+
+    pod_counter: u64,
+    deployment_counter: u64,
 }
 
 impl APIServer {
@@ -37,9 +43,13 @@ impl APIServer {
             working_nodes: BTreeMap::default(),
             failed_nodes: BTreeMap::default(),
             pod_to_node_map: HashMap::default(),
+            deployment_to_replicas: HashMap::default(),
+            deployments: HashMap::default(),
             scheduler: None,
             ctx,
             sim_config,
+            pod_counter: 0,
+            deployment_counter: 0,
         }
     }
 
@@ -131,6 +141,16 @@ impl APIServer {
         }
         sum_memory_load / sum_memory_total
     }
+
+    pub fn generate_pod_id(&mut self) -> u64 {
+        self.pod_counter += 1;
+        self.pod_counter
+    }
+
+    pub fn generate_deployment_id(&mut self) -> u64 {
+        self.deployment_counter += 1;
+        self.deployment_counter
+    }
 }
 
 impl EventHandler for APIServer {
@@ -149,7 +169,6 @@ impl EventHandler for APIServer {
                 self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
             }
             PodAssigningSucceeded { pod, node_id } => {
-                let node_name = format!("node_{}", node_id);
                 self.ctx.emit(PodPlacementRequest { pod, node_id },
                     self.working_nodes.get(&node_id).unwrap().borrow().id, self.sim_config.message_delay);
             }
@@ -167,6 +186,41 @@ impl EventHandler for APIServer {
             }
             RemoveNode { node_id } => {
                 self.remove_node(node_id);
+            }
+            DeploymentCreateRequest { deployment } => {
+                let mut scheduler = self.scheduler.clone().unwrap();
+                let mut replicas = Vec::default();
+                for _ in 0..deployment.cnt_replicas {
+                    let id = self.generate_pod_id();
+                    scheduler.borrow_mut().add_pod(deployment.create_new_replica(id));
+                    replicas.push(id);
+                }
+                self.deployments.insert(deployment.id, deployment.clone());
+                self.deployment_to_replicas.insert(deployment, replicas);
+            }
+            DeploymentHorizontalAutoscaling { id, new_cnt_replicas } => {
+                let deployment = self.deployments.remove(&id);
+                if deployment.is_none() {
+                    return;
+                }
+                let mut deployment = deployment.unwrap();
+                let mut replicas = self.deployment_to_replicas.remove(&deployment).unwrap();
+                if new_cnt_replicas < deployment.cnt_replicas {
+                    for _ in 0..(deployment.cnt_replicas - new_cnt_replicas) {
+                        let pod_id = replicas.pop().unwrap();
+                        self.ctx.emit(PodRemoveRequest { pod_id }, self.id, self.sim_config.message_delay);
+                    }
+                } else {
+                    for _ in 0..(new_cnt_replicas - deployment.cnt_replicas) {
+                        let id = self.generate_pod_id();
+                        self.ctx.emit(PodAssigningRequest { pod: deployment.create_new_replica(id) },
+                            self.id, self.sim_config.message_delay);
+                        replicas.push(id);
+                    }
+                }
+                deployment.cnt_replicas = new_cnt_replicas;
+                self.deployments.insert(deployment.id, deployment.clone());
+                self.deployment_to_replicas.insert(deployment, replicas);
             }
         })
     }

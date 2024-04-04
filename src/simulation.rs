@@ -1,8 +1,7 @@
 use std::cell::RefCell;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use dslab_core::context::SimulationContext;
-use dslab_core::{cast, Event, EventHandler};
 use dslab_core::simulation::Simulation;
 use crate::api_server::APIServer;
 use crate::scheduler::Scheduler;
@@ -10,13 +9,15 @@ use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
 use crate::cluster_autoscaler::ClusterAutoscaler;
 use crate::cluster_autoscaler_algorithm::ClusterAutoscalerAlgorithm;
-use crate::default_cluster_autoscaler_algorithms::default_simple_algorithm::SimpleClusterAutoscalerAlgorithm;
-use crate::default_scheduler_algorithms::mrp_algorithm::MRPAlgorithm;
+use crate::deployment::{Deployment, PodTemplate};
 use crate::events::api_server::PodRemoveRequest;
 use crate::events::assigning::PodAssigningRequest;
-use crate::events::autoscaler::{ClusterAutoscalerScan, MetricsServerSnapshot, VerticalAutoscalerCycle};
-use crate::events::node::{AllocateNewDefaultNodes, NodeStatusChanged};
-use crate::load_model::{ConstantLoadModel, LoadModel};
+use crate::events::autoscaler::{ClusterAutoscalerScan, HorizontalAutoscalerCycle, MetricsServerSnapshot, VerticalAutoscalerCycle};
+use crate::events::deployment::DeploymentCreateRequest;
+use crate::events::node::NodeStatusChanged;
+use crate::horizontal_autoscaler::HorizontalAutoscaler;
+use crate::horizontal_autoscaler_algorithm::HorizontalAutoscalerAlgorithm;
+use crate::load_model::LoadModel;
 use crate::metrics_server::MetricsServer;
 use crate::node::{Node, NodeState};
 use crate::pod::{Pod, PodStatus};
@@ -30,13 +31,13 @@ pub struct K8sSimulation {
     cluster_autoscaler: Option<Rc<RefCell<ClusterAutoscaler>>>,
     metrics_server: Option<Rc<RefCell<MetricsServer>>>,
     vertical_autoscaler: Option<Rc<RefCell<VerticalAutoscaler>>>,
+    horizontal_autoscaler: Option<Rc<RefCell<HorizontalAutoscaler>>>,
     
     sim: Simulation,
     ctx: SimulationContext,
     sim_config: Rc<SimulationConfig>,
 
     last_node_id: u64,
-    last_pod_id: u64,
 }
 
 impl K8sSimulation {
@@ -44,7 +45,8 @@ impl K8sSimulation {
     pub fn new(mut sim: Simulation, sim_config: SimulationConfig,
                scheduler_algorithm: Box<dyn SchedulerAlgorithm>,
                cluster_autoscaler_algorithm: Option<Box<dyn ClusterAutoscalerAlgorithm>>,
-               vertical_autoscaler_algorithm: Option<Box<dyn VerticalAutoscalerAlgorithm>>) -> Self {
+               vertical_autoscaler_algorithm: Option<Box<dyn VerticalAutoscalerAlgorithm>>,
+               horizontal_autoscaler_algorithm: Option<Box<dyn HorizontalAutoscalerAlgorithm>>) -> Self {
         let sim_config = rc!(sim_config);
 
         let api_server = rc!(refcell!(
@@ -86,7 +88,7 @@ impl K8sSimulation {
         }
 
         let mut metrics_server_option = None;
-        if vertical_autoscaler_algorithm.is_some() {
+        if vertical_autoscaler_algorithm.is_some() || horizontal_autoscaler_algorithm.is_some() {
             let metrics_server_ctx = sim.create_context("metrics_server");
             let metrics_server = rc!(refcell!(
                 MetricsServer::new(api_server.clone(), metrics_server_ctx, sim_config.clone())));
@@ -105,7 +107,20 @@ impl K8sSimulation {
             sim.add_handler("vertical_autoscaler", vertical_autoscaler.clone());
             vertical_autoscaler_option = Some(vertical_autoscaler.clone());
 
-            ctx.emit(VerticalAutoscalerCycle{}, vertical_autoscaler.borrow().id, 0.0);
+            ctx.emit(VerticalAutoscalerCycle {}, vertical_autoscaler.borrow().id, 0.0);
+        }
+
+        let mut horizontal_autoscaler_option = None;
+        if horizontal_autoscaler_algorithm.is_some() {
+            let horizontal_ctx = sim.create_context("horizontal_autoscaler");
+            let horizontal_autoscaler = rc!(refcell!(
+                HorizontalAutoscaler::new(api_server.clone(), metrics_server_option.clone().unwrap(),
+                    horizontal_autoscaler_algorithm.unwrap(), horizontal_ctx, sim_config.clone())
+            ));
+            sim.add_handler("horizontal_autoscaler", horizontal_autoscaler.clone());
+            horizontal_autoscaler_option = Some(horizontal_autoscaler.clone());
+
+            ctx.emit(HorizontalAutoscalerCycle {}, horizontal_autoscaler.borrow().id, 0.0);
         }
 
         let mut sim = Self {
@@ -114,10 +129,10 @@ impl K8sSimulation {
             cluster_autoscaler: cluster_autoscaler_option,
             metrics_server: metrics_server_option,
             vertical_autoscaler: vertical_autoscaler_option,
+            horizontal_autoscaler: horizontal_autoscaler_option,
             sim,
             ctx,
             sim_config,
-            last_pod_id: 0,
             last_node_id: 0
         };
 
@@ -154,16 +169,34 @@ impl K8sSimulation {
     }
 
     pub fn submit_pod(&mut self, requested_cpu: f32, requested_memory: f64, limit_cpu: f32,
-                      limit_memory: f64, priority_weight: u64, delay: f64,
+                      limit_memory: f64, priority_weight: u64,
                       cpu_load_model: Box<dyn LoadModel>,
-                      memory_load_model: Box<dyn LoadModel>) -> u64 {
-        self.last_pod_id += 1;
-        let pod = Pod::new(self.last_pod_id, cpu_load_model, memory_load_model, requested_cpu,
+                      memory_load_model: Box<dyn LoadModel>,
+                      delay: f64) -> u64 {
+        let id = self.api_server.borrow_mut().generate_pod_id();
+        let pod = Pod::new(id, cpu_load_model, memory_load_model, requested_cpu,
                            requested_memory, limit_cpu, limit_memory, priority_weight,
                            PodStatus::Pending);
-        self.ctx.emit(PodAssigningRequest { pod }, self.api_server.borrow().id,
-                      self.sim_config.control_plane_message_delay + delay);
-        self.last_pod_id
+        self.ctx.emit(PodAssigningRequest { pod }, self.api_server.borrow().id, delay);
+        id
+    }
+
+    pub fn submit_deployment(&mut self, requested_cpu: f32, requested_memory: f64, limit_cpu: f32,
+                             limit_memory: f64, priority_weight: u64,
+                             cpu_load_model: Box<dyn LoadModel>,
+                             memory_load_model: Box<dyn LoadModel>,
+                             cnt_replicas: u64,
+                             delay: f64) -> u64 {
+        let id = self.api_server.borrow_mut().generate_deployment_id();
+        let pod_template = PodTemplate {
+            cpu_load_model, memory_load_model,
+            requested_cpu, requested_memory,
+            limit_cpu, limit_memory,
+            priority_weight
+        };
+        let deployment = Deployment::new(id, pod_template, cnt_replicas);
+        self.ctx.emit(DeploymentCreateRequest { deployment }, self.api_server.borrow().id, delay);
+        id
     }
 
     pub fn remove_pod(&self, pod_id: u64) {
