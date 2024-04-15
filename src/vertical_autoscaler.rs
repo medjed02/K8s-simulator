@@ -34,8 +34,9 @@ impl VerticalAutoscaler {
 
     fn collect_recommendations(&mut self) -> Vec<VPARecommendation> {
         let mut recommendations = Vec::<VPARecommendation>::default();
+        let metrics_server = self.metrics_server.borrow();
         for pod_id in self.api_server.borrow().pod_to_node_map.keys() {
-            let statistic = self.metrics_server.borrow().get_pod_statistics(*pod_id);
+            let statistic = metrics_server.get_pod_statistics(*pod_id);
             if statistic.is_none() {
                 continue;
             }

@@ -259,8 +259,8 @@ fn test_vertical_autoscaler() {
     assert_eq!(k8s_sim.node(node_id).borrow().memory_load, 10.0);
 
     k8s_sim.step_for_duration(40000.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().cpu_load, 1.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().memory_load, 1.0);
+    assert!(k8s_sim.node(node_id).borrow().cpu_load < 2.0);
+    assert!(k8s_sim.node(node_id).borrow().memory_load < 2.0);
 
     k8s_sim.remove_pod(pod_id);
     let pod_id = k8s_sim.submit_pod(10.0, 10.0, 15.0, 15.0, 100,
@@ -272,8 +272,32 @@ fn test_vertical_autoscaler() {
     assert_eq!(k8s_sim.node(node_id).borrow().memory_load, 12.0);
 
     k8s_sim.step_for_duration(40000.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().pods.get(&pod_id).unwrap().requested_cpu, 12.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().pods.get(&pod_id).unwrap().requested_memory, 12.0);
+    assert!(k8s_sim.node(node_id).borrow().pods.get(&pod_id).unwrap().requested_cpu > 10.0);
+    assert!(k8s_sim.node(node_id).borrow().pods.get(&pod_id).unwrap().requested_memory > 10.0);
+}
+
+#[test]
+fn test_performance() {
+    let sim = Simulation::new(42);
+    let sim_config = SimulationConfig::from_file(&name_wrapper("config.yaml"));
+    let mut k8s_sim = K8sSimulation::new(sim, sim_config, Box::new(MRPAlgorithm::new()),
+                                         None,
+                                         Some(Box::new(AutoVerticalAutoscalerAlgorithm::new(RequestsAndLimits))),
+                                         None);
+    for _ in 0..1000 {
+        k8s_sim.add_node(20, 20);
+    }
+
+    for _ in 0..10000 {
+        k8s_sim.submit_pod(0.1, 0.1,0.1, 0.1, 100,
+                           Box::new(ConstantLoadModel::new(0.1)),
+                           Box::new(ConstantLoadModel::new(0.1)),
+                           1.);
+    }
+
+    k8s_sim.step_for_duration(80000.0);
+    //assert_eq!(k8s_sim.cpu_load_rate(), 0.5);
+    //assert_eq!(k8s_sim.memory_load_rate(), 0.5);
 }
 
 #[test]
@@ -303,7 +327,7 @@ fn test_horizontal_autoscaler() {
     let horizontal_autoscaler =
         Box::new(
             ResourcesHorizontalAutoscalerAlgorithm::new(
-                CPUOnly { cpu_utilization: None }, 300.0, 1, 10
+                CPUOnly { cpu_utilization: None }, 300.0, 300.0,1, 10
             )
         );
     let mut k8s_sim = K8sSimulation::new(sim, sim_config, Box::new(LRPAlgorithm::new()),

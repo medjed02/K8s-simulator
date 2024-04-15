@@ -21,3 +21,4 @@ pub mod deployment;
 pub mod horizontal_autoscaler;
 pub mod horizontal_autoscaler_algorithm;
 pub mod default_horizontal_autoscaler_algorithms;
+pub mod histogram;

@@ -34,9 +34,10 @@ impl HorizontalAutoscaler {
 
     pub fn try_to_scale(&mut self) {
         let api_server = self.api_server.borrow();
+        let metrics_server = self.metrics_server.borrow();
         for (deployment, replicas) in &api_server.deployment_to_replicas {
             let statistics = replicas.into_iter()
-                .map(|id| self.metrics_server.borrow().get_pod_statistics(*id));
+                .map(|id| metrics_server.get_pod_statistics(*id));
             let not_fully_deployed = statistics.clone()
                 .map(|statistic| statistic.is_none())
                 .any(|x| x);

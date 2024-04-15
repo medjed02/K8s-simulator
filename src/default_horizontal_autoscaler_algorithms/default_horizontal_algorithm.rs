@@ -13,19 +13,21 @@ pub enum ControlledResources {
 
 pub struct ResourcesHorizontalAutoscalerAlgorithm {
     controlled_resources: ControlledResources,
-    last_scale_time: HashMap<u64, f64>,
+    last_downscale_time: HashMap<u64, f64>,
     initialization_period: f64,
+    time_downscale_stabilization: f64,
     min_replicas: u64,
     max_replicas: u64,
 }
 
 impl ResourcesHorizontalAutoscalerAlgorithm {
     pub fn new(controlled_resources: ControlledResources, initialization_period: f64,
-               min_replicas: u64, max_replicas: u64) -> Self {
+               time_downscale_stabilization: f64, min_replicas: u64, max_replicas: u64) -> Self {
         Self {
             controlled_resources,
-            last_scale_time: HashMap::default(),
+            last_downscale_time: HashMap::default(),
             initialization_period,
+            time_downscale_stabilization,
             min_replicas,
             max_replicas,
         }
@@ -35,52 +37,50 @@ impl ResourcesHorizontalAutoscalerAlgorithm {
 impl HorizontalAutoscalerAlgorithm for ResourcesHorizontalAutoscalerAlgorithm {
     fn get_new_count_replicas(&mut self, deployment: &Deployment,
                               statistics: &Vec<PodStatistic>, now_time: f64) -> u64 {
-        let mut new_cnt_replicas = deployment.cnt_replicas;
+        if self.last_downscale_time.contains_key(&deployment.id) &&
+            self.last_downscale_time.get(&deployment.id).unwrap() + self.time_downscale_stabilization > now_time {
+            return deployment.cnt_replicas;
+        }
 
-        let mut cpu = 0.0;
-        let mut memory = 0.0;
+        let mut average_cpu = 0.0;
+        let mut average_memory = 0.0;
         for statistic in statistics {
-            if statistic.period_time < self.initialization_period ||
-                statistic.resource_history.len() == 0 {
+            if statistic.cpu_distribution.history_time() < self.initialization_period {
                 return deployment.cnt_replicas;
             }
-            let mut i = statistic.resource_history.len() - 1;
-            let mut sum_replica_cpu = 0.0;
-            let mut sum_replica_memory = 0.0;
-            while i >= 0 {
-                if now_time - statistic.resource_history[i].snapshot_time > self.initialization_period {
-                    break
-                }
-                sum_replica_cpu += statistic.resource_history[i].cpu;
-                sum_replica_memory += statistic.resource_history[i].memory;
-                i -= 1;
-            }
-            let snapshots_in_window = statistic.resource_history.len() - i - 1;
-            cpu += sum_replica_cpu / (snapshots_in_window as f32);
-            memory += sum_replica_memory / (snapshots_in_window as f64);
+            average_cpu += statistic.last_snapshot.cpu;
+            average_memory += statistic.last_snapshot.memory;
         }
+        average_cpu /= deployment.cnt_replicas as f32;
+        average_memory /= deployment.cnt_replicas as f64;
+
+        let mut new_cnt_replicas = deployment.cnt_replicas;
 
         match self.controlled_resources {
             ControlledResources::CPUOnly { cpu_utilization } => {
                 let target_cpu_utilization = cpu_utilization.unwrap_or(1.);
                 let target_cpu = deployment.pod_template.requested_cpu * target_cpu_utilization;
-                new_cnt_replicas = new_cnt_replicas.max((target_cpu / cpu).ceil() as u64);
+                new_cnt_replicas = new_cnt_replicas.max((target_cpu / average_cpu).ceil() as u64);
             },
             ControlledResources::MemoryOnly { memory_utilization } => {
                 let target_memory_utilization = memory_utilization.unwrap_or(1.);
                 let target_memory = deployment.pod_template.requested_memory * target_memory_utilization;
-                new_cnt_replicas = new_cnt_replicas.max((target_memory / memory).ceil() as u64);
+                new_cnt_replicas = new_cnt_replicas.max((target_memory / average_memory).ceil() as u64);
             },
             ControlledResources::CPUAndMemory { cpu_utilization, memory_utilization } => {
                 let target_cpu_utilization = cpu_utilization.unwrap_or(1.);
                 let target_cpu = deployment.pod_template.requested_cpu * target_cpu_utilization;
-                new_cnt_replicas = new_cnt_replicas.max((target_cpu / cpu).ceil() as u64);
+                new_cnt_replicas = new_cnt_replicas.max((target_cpu / average_cpu).ceil() as u64);
 
                 let target_memory_utilization = memory_utilization.unwrap_or(1.);
                 let target_memory = deployment.pod_template.requested_memory * target_memory_utilization;
-                new_cnt_replicas = new_cnt_replicas.max((target_memory / memory).ceil() as u64);
+                new_cnt_replicas = new_cnt_replicas.max((target_memory / average_memory).ceil() as u64);
             }
         };
+
+        if new_cnt_replicas < deployment.cnt_replicas {
+            self.last_downscale_time.insert(deployment.id, now_time);
+        }
 
         new_cnt_replicas
     }
