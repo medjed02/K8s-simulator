@@ -176,3 +176,11 @@ pub mod autoscaler {
     pub struct HorizontalAutoscalerCycle {
     }
 }
+
+pub mod logger {
+    use serde::Serialize;
+
+    #[derive(Clone, Serialize)]
+    pub struct MetricsSnapshot {
+    }
+}

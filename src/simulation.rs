@@ -9,6 +9,7 @@ use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
 use crate::cluster_autoscaler::ClusterAutoscaler;
 use crate::cluster_autoscaler_algorithm::ClusterAutoscalerAlgorithm;
+use crate::dataset_reader::DatasetReader;
 use crate::deployment::{Deployment, PodTemplate};
 use crate::events::api_server::PodRemoveRequest;
 use crate::events::assigning::PodAssigningRequest;
@@ -18,10 +19,12 @@ use crate::events::node::NodeStatusChanged;
 use crate::horizontal_autoscaler::HorizontalAutoscaler;
 use crate::horizontal_autoscaler_algorithm::HorizontalAutoscalerAlgorithm;
 use crate::load_model::LoadModel;
+use crate::logger::Logger;
 use crate::metrics_server::MetricsServer;
 use crate::node::{Node, NodeState};
 use crate::pod::{Pod, PodStatus};
 use crate::scheduler_algorithm::SchedulerAlgorithm;
+use crate::simulation_metrics::MetricsLogger;
 use crate::vertical_autoscaler::VerticalAutoscaler;
 use crate::vertical_autoscaler_algorithm::VerticalAutoscalerAlgorithm;
 
@@ -42,15 +45,15 @@ pub struct K8sSimulation {
 
 impl K8sSimulation {
     /// Creates a simulation with specified config.
-    pub fn new(mut sim: Simulation, sim_config: SimulationConfig,
-               scheduler_algorithm: Box<dyn SchedulerAlgorithm>,
+    pub fn new(mut sim: Simulation, metrics_logger: Box<dyn MetricsLogger>, logger: Box<dyn Logger>,
+               sim_config: SimulationConfig, scheduler_algorithm: Box<dyn SchedulerAlgorithm>,
                cluster_autoscaler_algorithm: Option<Box<dyn ClusterAutoscalerAlgorithm>>,
                vertical_autoscaler_algorithm: Option<Box<dyn VerticalAutoscalerAlgorithm>>,
                horizontal_autoscaler_algorithm: Option<Box<dyn HorizontalAutoscalerAlgorithm>>) -> Self {
         let sim_config = rc!(sim_config);
 
         let api_server = rc!(refcell!(
-            APIServer::new(sim.create_context("api_server"), sim_config.clone())
+            APIServer::new(sim.create_context("api_server"), sim_config.clone(), metrics_logger)
         ));
         sim.add_handler("api_server", api_server.clone());
 
@@ -95,6 +98,8 @@ impl K8sSimulation {
             sim.add_handler("metrics_server", metrics_server.clone());
             metrics_server_option = Some(metrics_server.clone());
 
+            api_server.borrow_mut().set_metrics_server(metrics_server.clone());
+
             ctx.emit(MetricsServerSnapshot{}, metrics_server.borrow().id, 0.0);
         }
 
@@ -137,8 +142,24 @@ impl K8sSimulation {
         };
 
         for node_config in sim.sim_config.nodes.clone() {
-            for i in 0..node_config.count {
+            for _ in 0..node_config.count {
                 sim.add_node(node_config.cpu, node_config.memory);
+            }
+        }
+
+        if sim.sim_config.trace.is_some() {
+            let mut dataset = DatasetReader::new();
+            dataset.parse(  sim.sim_config.trace.as_ref().unwrap().path.clone());
+
+            for node in dataset.node_requests.iter() {
+                sim.add_node(node.cpu, node.memory);
+            }
+
+            while !dataset.pod_requests.is_empty() {
+                let mut pod = dataset.pod_requests.pop().unwrap();
+                sim.submit_pod(pod.requested_cpu, pod.requested_memory,
+                               pod.limit_cpu, pod.limit_memory, pod.priority_weight,
+                               pod.cpu_load_model, pod.memory_load_model, pod.timestamp);
             }
         }
 
@@ -146,7 +167,7 @@ impl K8sSimulation {
     }
 
     /// Add new node to the k8s cluster, return node_id
-    pub fn add_node(&mut self, cpu_total: u32, memory_total: u64) -> u32 {
+    pub fn add_node(&mut self, cpu_total: u32, memory_total: f64) -> u32 {
         self.last_node_id += 1;
         let name = format!("node_{}", self.last_node_id);
         let node_ctx = self.sim.create_context(&name);
@@ -237,12 +258,16 @@ impl K8sSimulation {
 
     /// Returns the current CPU load rate (% of overall CPU used).
     pub fn cpu_load_rate(&self) -> f64 {
-        self.api_server.borrow().average_cpu_load()
+        self.api_server.borrow().cpu_load_rate()
     }
 
     /// Returns the current memory load rate (% of overall RAM used).
     pub fn memory_load_rate(&self) -> f64 {
         self.api_server.borrow().memory_load_rate()
+    }
+
+    pub fn finish_simulation(&self, path: &str) -> Result<(), std::io::Error> {
+        self.api_server.borrow_mut().finish_and_save_log_metrics(path)
     }
 
     /// Performs the specified number of steps through the simulation (see dslab-core docs).

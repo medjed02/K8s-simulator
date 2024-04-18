@@ -95,13 +95,13 @@ impl Scheduler {
                 }
                 let node_id = filtered_nodes[max_score_ind];
 
-                elapsed_time += start_of_algorithm_work.elapsed().as_secs_f64();
+                elapsed_time += start_of_algorithm_work.elapsed().as_secs_f64() + self.sim_config.message_delay;
                 if !self.api_server.borrow().working_nodes.is_empty() {
                     self.ctx.emit(SchedulingCycle {}, self.id, elapsed_time);
                 }
-                elapsed_time += self.sim_config.control_plane_message_delay;
                 pod.scheduling_attempts = None;
                 pod.scheduling_timestamp = None;
+                elapsed_time += self.sim_config.control_plane_message_delay;
                 self.ctx.emit(PodAssigningSucceeded { pod, node_id },
                               self.api_server.borrow().id, elapsed_time);
             },

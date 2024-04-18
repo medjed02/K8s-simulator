@@ -22,3 +22,6 @@ pub mod horizontal_autoscaler;
 pub mod horizontal_autoscaler_algorithm;
 pub mod default_horizontal_autoscaler_algorithms;
 pub mod histogram;
+pub mod simulation_metrics;
+pub mod logger;
+pub mod dataset_reader;

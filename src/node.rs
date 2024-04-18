@@ -36,7 +36,7 @@ impl Display for NodeState {
 pub struct Node {
     pub id: u32,
     pub cpu_total: u32,
-    pub memory_total: u64,
+    pub memory_total: f64,
     pub cpu_load: f32,
     pub memory_load: f64,
     pub state: NodeState,
@@ -50,7 +50,7 @@ pub struct Node {
 impl Node {
     pub fn new(
         cpu_total: u32,
-        memory_total: u64,
+        memory_total: f64,
         cpu_load: f32,
         memory_load: f64,
         state: NodeState,

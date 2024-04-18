@@ -79,11 +79,11 @@ impl Pod {
             status,
         }
     }
-    pub fn get_wanted_cpu(&self, time: f64) -> f64 {
+    pub fn get_wanted_cpu(&mut self, time: f64) -> f64 {
         self.cpu_load_model.get_resource(time, time - self.start_time)
     }
 
-    pub fn get_wanted_memory(&self, time: f64) -> f64 {
+    pub fn get_wanted_memory(&mut self, time: f64) -> f64 {
         self.memory_load_model.get_resource(time, time - self.start_time)
     }
 }

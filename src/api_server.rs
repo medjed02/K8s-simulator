@@ -17,8 +17,11 @@ use crate::events::node::{AllocateNewDefaultNodes, NodeStatusChanged, RemoveNode
 use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest, PodPlacementSucceeded, PodPlacementFailed};
 use crate::events::api_server::PodRemoveRequest;
 use crate::events::deployment::{DeploymentCreateRequest, DeploymentHorizontalAutoscaling};
+use crate::events::logger::MetricsSnapshot;
 use crate::events::scheduler::MoveRequest;
+use crate::metrics_server::MetricsServer;
 use crate::scheduler::Scheduler;
+use crate::simulation_metrics::{Metrics, MetricsLogger};
 
 pub struct APIServer {
     pub id: u32,
@@ -27,17 +30,26 @@ pub struct APIServer {
     pub pod_to_node_map: HashMap<u64, u32>,
     pub deployment_to_replicas: HashMap<Deployment, Vec<u64>>,
     pub deployments: HashMap<u64, Deployment>,
+
     scheduler: Option<Rc<RefCell<Scheduler>>>,
+    metrics_server: Option<Rc<RefCell<MetricsServer>>>,
 
     ctx: SimulationContext,
     sim_config: Rc<SimulationConfig>,
+
+    metrics_logger: Box<dyn MetricsLogger>,
 
     pod_counter: u64,
     deployment_counter: u64,
 }
 
 impl APIServer {
-    pub fn new(ctx: SimulationContext, sim_config: Rc<SimulationConfig>) -> Self {
+    pub fn new(ctx: SimulationContext, sim_config: Rc<SimulationConfig>,
+               metrics_logger: Box<dyn MetricsLogger>) -> Self {
+        if metrics_logger.snapshot_period() > 0.0 {
+            ctx.emit(MetricsSnapshot {}, ctx.id(), metrics_logger.snapshot_period());
+        }
+
         Self {
             id: ctx.id(),
             working_nodes: BTreeMap::default(),
@@ -46,8 +58,10 @@ impl APIServer {
             deployment_to_replicas: HashMap::default(),
             deployments: HashMap::default(),
             scheduler: None,
+            metrics_server: None,
             ctx,
             sim_config,
+            metrics_logger,
             pod_counter: 0,
             deployment_counter: 0,
         }
@@ -55,6 +69,10 @@ impl APIServer {
 
     pub fn set_scheduler(&mut self, scheduler: Rc<RefCell<Scheduler>>) {
         self.scheduler = Some(scheduler);
+    }
+
+    pub fn set_metrics_server(&mut self, metrics_server: Rc<RefCell<MetricsServer>>) {
+        self.metrics_server = Some(metrics_server);
     }
 
 
@@ -142,6 +160,22 @@ impl APIServer {
         sum_memory_load / sum_memory_total
     }
 
+    pub fn log_metrics(&mut self) {
+        let metrics = Metrics::new(
+            self.ctx.time(),
+            self.cpu_load_rate(),
+            self.average_cpu_load(),
+            self.memory_load_rate(),
+            self.average_memory_load(),
+        );
+        self.metrics_logger.log_metrics(metrics);
+    }
+
+    pub fn finish_and_save_log_metrics(&mut self, path: &str) -> Result<(), std::io::Error>  {
+        self.log_metrics();
+        self.metrics_logger.save_log(path)
+    }
+
     pub fn generate_pod_id(&mut self) -> u64 {
         self.pod_counter += 1;
         self.pod_counter
@@ -179,6 +213,7 @@ impl EventHandler for APIServer {
                 self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
             }
             PodRemoveRequest { pod_id } => {
+                self.metrics_server.clone().unwrap().borrow_mut().clear_pod_statistics(pod_id);
                 let node_id = self.pod_to_node_map.get(&pod_id);
                 if node_id.is_some() {
                     self.working_nodes.get(node_id.unwrap()).unwrap().borrow_mut().remove_pod(pod_id);
@@ -221,6 +256,13 @@ impl EventHandler for APIServer {
                 deployment.cnt_replicas = new_cnt_replicas;
                 self.deployments.insert(deployment.id, deployment.clone());
                 self.deployment_to_replicas.insert(deployment, replicas);
+            }
+            MetricsSnapshot {} => {
+                self.log_metrics();
+
+                if self.metrics_logger.snapshot_period() > 0.0 {
+                    self.ctx.emit(MetricsSnapshot {}, self.id, self.metrics_logger.snapshot_period());
+                }
             }
         })
     }

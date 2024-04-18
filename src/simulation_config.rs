@@ -8,13 +8,13 @@ pub struct NodeConfig {
     /// Node CPU capacity.
     pub cpu: u32,
     /// Node memory capacity in GB.
-    pub memory: u64,
+    pub memory: f64,
     /// Number of such nodes.
     pub count: u32,
 }
 
 impl NodeConfig {
-    pub fn new(cpu: u32, memory: u64, count: u32) -> Self {
+    pub fn new(cpu: u32, memory: f64, count: u32) -> Self {
         Self {
             cpu,
             memory,
@@ -57,6 +57,13 @@ impl PodConfig {
     }
 }
 
+/// Holds information about the used trace dataset.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
+pub struct DatasetConfig {
+    /// Dataset path.
+    pub path: String,
+}
+
 /// Holds raw simulation config parsed from YAML file.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 struct RawSimulationConfig {
@@ -75,6 +82,7 @@ struct RawSimulationConfig {
     pub vpa_interval: Option<f64>,
     pub hpa_interval: Option<f64>,
     pub nodes: Option<Vec<NodeConfig>>,
+    pub trace: Option<DatasetConfig>,
 }
 
 /// Represents simulation configuration.
@@ -110,6 +118,8 @@ pub struct SimulationConfig {
     pub hpa_interval: f64,
     /// Configurations of nodes.
     pub nodes: Vec<NodeConfig>,
+    /// Used trace dataset.
+    pub trace: Option<DatasetConfig>,
 }
 
 impl SimulationConfig {
@@ -125,13 +135,14 @@ impl SimulationConfig {
             pod_initial_backoff_duration,
             pod_max_backoff_duration,
             cluster_autoscaler_scan_interval: 10.0,
-            default_node: NodeConfig::new(8, 64, 1),
+            default_node: NodeConfig::new(8, 64., 1),
             default_node_allocation_time: 120.0,
             cloud_nodes_count: 100,
             metrics_server_interval: 30.0,
             vpa_interval: 30.0,
             hpa_interval: 30.0,
             nodes: Vec::default(),
+            trace: None,
         }
     }
 
@@ -149,13 +160,14 @@ impl SimulationConfig {
             pod_initial_backoff_duration: raw.pod_initial_backoff_duration.unwrap_or(1.0),
             pod_max_backoff_duration: raw.pod_max_backoff_duration.unwrap_or(10.0),
             cluster_autoscaler_scan_interval: raw.cluster_autoscaler_scan_interval.unwrap_or(10.0),
-            default_node: raw.default_node.unwrap_or(NodeConfig::new(8, 64, 1)),
+            default_node: raw.default_node.unwrap_or(NodeConfig::new(8, 64., 1)),
             default_node_allocation_time: raw.default_node_allocation_time.unwrap_or(120.0),
             cloud_nodes_count: raw.cloud_nodes_count.unwrap_or(100),
             metrics_server_interval: raw.metrics_server_interval.unwrap_or(30.0),
             vpa_interval: raw.vpa_interval.unwrap_or(30.0),
             hpa_interval: raw.hpa_interval.unwrap_or(30.0),
-            nodes: raw.nodes.unwrap_or_default()
+            nodes: raw.nodes.unwrap_or_default(),
+            trace: raw.trace,
         }
     }
 }
