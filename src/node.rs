@@ -37,8 +37,10 @@ pub struct Node {
     pub id: u32,
     pub cpu_total: u32,
     pub memory_total: f64,
-    pub cpu_load: f32,
-    pub memory_load: f64,
+    pub cpu_allocated: f32,
+    pub memory_allocated: f64,
+    pub cpu_used: f32,
+    pub memory_used: f64,
     pub state: NodeState,
     pub pods: HashMap<u64, Pod>,
     pub api_server: Rc<RefCell<APIServer>>,
@@ -51,8 +53,6 @@ impl Node {
     pub fn new(
         cpu_total: u32,
         memory_total: f64,
-        cpu_load: f32,
-        memory_load: f64,
         state: NodeState,
         api_server: Rc<RefCell<APIServer>>,
         ctx: SimulationContext,
@@ -63,8 +63,10 @@ impl Node {
             id: ctx.id(),
             cpu_total,
             memory_total,
-            cpu_load,
-            memory_load,
+            cpu_allocated: 0.0,
+            memory_allocated: 0.0,
+            cpu_used: 0.0,
+            memory_used: 0.0,
             state,
             pods: HashMap::new(),
             api_server,
@@ -74,11 +76,11 @@ impl Node {
     }
 
     pub fn get_free_cpu(&self) -> f32 {
-        (self.cpu_total as f32) - self.cpu_load
+        (self.cpu_total as f32) - self.cpu_allocated
     }
 
     pub fn get_free_memory(&self) -> f64 {
-        (self.memory_total as f64) - self.memory_load
+        (self.memory_total as f64) - self.memory_allocated
     }
 
     pub fn get_cpu_utilization(&self) -> f64 {
@@ -102,8 +104,11 @@ impl Node {
             .min(pod.limit_memory)
             .min(self.get_free_memory());
 
-        self.cpu_load += pod.cpu.max(pod.requested_cpu);
-        self.memory_load += pod.memory.max(pod.requested_memory);
+
+        self.cpu_used += pod.cpu;
+        self.memory_used += pod.memory;
+        self.cpu_allocated += pod.cpu.max(pod.requested_cpu);
+        self.memory_allocated += pod.memory.max(pod.requested_memory);
 
         self.pods.insert(pod.id, pod);
         None
@@ -111,8 +116,11 @@ impl Node {
 
     pub fn remove_pod(&mut self, pod_id: u64) -> Pod {
         let pod = self.pods.get(&pod_id).unwrap();
-        self.cpu_load -= pod.cpu.max(pod.requested_cpu);
-        self.memory_load -= pod.memory.max(pod.requested_memory);
+
+        self.cpu_used -= pod.cpu;
+        self.memory_used -= pod.memory;
+        self.cpu_allocated -= pod.cpu.max(pod.requested_cpu);
+        self.memory_allocated -= pod.memory.max(pod.requested_memory);
 
         let mut pod = self.pods.remove(&pod_id).unwrap();
         pod.cpu = 0.0;
@@ -122,16 +130,19 @@ impl Node {
 
     pub fn update_pods_resources(&mut self) {
         for (_, pod) in self.pods.iter_mut() {
+
             let wanted_cpu = pod.get_wanted_cpu(self.ctx.time()).min(pod.limit_cpu as f64);
-            let free_cpu = (self.cpu_total as f32) - self.cpu_load;
+            let free_cpu = (self.cpu_total as f32) - self.cpu_allocated;
             let new_cpu = pod.cpu + ((wanted_cpu as f32) - pod.cpu).min(free_cpu);
-            self.cpu_load = self.cpu_load - pod.cpu.max(pod.requested_cpu) + new_cpu.max(pod.requested_cpu);
+            self.cpu_allocated = self.cpu_allocated - pod.cpu.max(pod.requested_cpu) + new_cpu.max(pod.requested_cpu);
+            self.cpu_used = self.cpu_used - pod.cpu + new_cpu;
             pod.cpu = new_cpu;
 
             let wanted_memory = pod.get_wanted_memory(self.ctx.time()).min(pod.limit_memory);
-            let free_memory = (self.memory_total as f64) - self.memory_load;
+            let free_memory = (self.memory_total as f64) - self.memory_allocated;
             let new_memory = pod.memory + (wanted_memory - pod.memory).min(free_memory);
-            self.memory_load = self.memory_load - pod.memory.max(pod.requested_memory) + new_memory.max(pod.requested_memory);
+            self.memory_allocated = self.memory_allocated - pod.memory.max(pod.requested_memory) + new_memory.max(pod.requested_memory);
+            self.memory_used = self.memory_used - pod.memory + new_memory;
             pod.memory = new_memory;
         }
     }

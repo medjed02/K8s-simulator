@@ -109,8 +109,10 @@ impl APIServer {
         }
         mut_node.pods.clear();
         mut_node.state = NodeState::Failed;
-        mut_node.cpu_load = 0.0;
-        mut_node.memory_load = 0.0;
+        mut_node.cpu_allocated = 0.0;
+        mut_node.memory_allocated = 0.0;
+        mut_node.cpu_used = 0.0;
+        mut_node.memory_used = 0.0;
         drop(mut_node);
         self.failed_nodes.insert(node_id, node);
     }
@@ -120,42 +122,82 @@ impl APIServer {
         &self.working_nodes
     }
 
-    /// Returns the average CPU load across all working nodes.
-    pub fn average_cpu_load(&self) -> f64 {
+    /// Returns the average allocated CPU across all working nodes.
+    pub fn average_cpu_allocated(&self) -> f64 {
         let mut sum_cpu_load: f64 = 0.0;
         for (node_id, node) in self.working_nodes.iter() {
-            sum_cpu_load += (node.borrow().cpu_load as f64);
+            sum_cpu_load += (node.borrow().cpu_allocated as f64);
         }
         sum_cpu_load / (self.working_nodes.len() as f64)
     }
 
-    /// Returns the average memory load across all working nodes.
-    pub fn average_memory_load(&self) -> f64 {
+    /// Returns the average allocated memory across all working nodes.
+    pub fn average_memory_allocated(&self) -> f64 {
         let mut sum_memory_load: f64 = 0.0;
         for (node_id, node) in self.working_nodes.iter() {
-            sum_memory_load += node.borrow().memory_load;
+            sum_memory_load += node.borrow().memory_allocated;
         }
         sum_memory_load / (self.working_nodes.len() as f64)
     }
 
-    /// Returns the current CPU load rate (% of overall CPU used).
-    pub fn cpu_load_rate(&self) -> f64 {
+    /// Returns the current allocated CPU load rate (% of overall CPU used).
+    pub fn cpu_allocated_load_rate(&self) -> f64 {
         let mut sum_cpu_load: f64 = 0.0;
         let mut sum_cpu_total: f64 = 0.0;
         for (node_id, node) in self.working_nodes.iter() {
-            sum_cpu_load += node.borrow().cpu_load as f64;
-            sum_cpu_total += node.borrow().cpu_total as f64
+            sum_cpu_load += node.borrow().cpu_allocated as f64;
+            sum_cpu_total += node.borrow().cpu_total as f64;
         }
         sum_cpu_load / sum_cpu_total
     }
 
-    /// Returns the current memory load rate (% of overall RAM used).
-    pub fn memory_load_rate(&self) -> f64 {
+    /// Returns the current allocated memory load rate (% of overall RAM used).
+    pub fn memory_allocated_load_rate(&self) -> f64 {
         let mut sum_memory_load: f64 = 0.0;
         let mut sum_memory_total: f64 = 0.0;
         for (_, node) in self.working_nodes.iter() {
-            sum_memory_load += node.borrow().memory_load;
-            sum_memory_total += node.borrow().memory_total as f64
+            sum_memory_load += node.borrow().memory_allocated;
+            sum_memory_total += node.borrow().memory_total;
+        }
+        sum_memory_load / sum_memory_total
+    }
+
+    /// Returns the average used CPU across all working nodes.
+    pub fn average_cpu_used(&self) -> f64 {
+        let mut sum_cpu_load: f64 = 0.0;
+        for (node_id, node) in self.working_nodes.iter() {
+            sum_cpu_load += (node.borrow().cpu_used as f64);
+        }
+        sum_cpu_load / (self.working_nodes.len() as f64)
+    }
+
+    /// Returns the average used memory across all working nodes.
+    pub fn average_memory_used(&self) -> f64 {
+        let mut sum_memory_load: f64 = 0.0;
+        for (node_id, node) in self.working_nodes.iter() {
+            sum_memory_load += node.borrow().memory_used;
+        }
+        sum_memory_load / (self.working_nodes.len() as f64)
+    }
+
+    /// Returns the current used CPU load rate (% of overall CPU used).
+    pub fn cpu_used_load_rate(&self) -> f64 {
+        let mut sum_cpu_load: f64 = 0.0;
+        let mut sum_cpu_total: f64 = 0.0;
+        for (node_id, node) in self.working_nodes.iter() {
+            sum_cpu_load += node.borrow().cpu_used as f64;
+            sum_cpu_total += node.borrow().cpu_total as f64;
+        }
+        sum_cpu_load / sum_cpu_total
+    }
+
+    /// Returns the current used memory load rate (% of overall RAM used).
+    pub fn memory_used_load_rate(&self) -> f64 {
+        let mut sum_memory_load: f64 = 0.0;
+        let mut sum_memory_total: f64 = 0.0;
+        for (_, node) in self.working_nodes.iter() {
+            sum_memory_load += node.borrow().memory_used;
+            sum_memory_total += node.borrow().memory_total;
         }
         sum_memory_load / sum_memory_total
     }
@@ -163,10 +205,14 @@ impl APIServer {
     pub fn log_metrics(&mut self) {
         let metrics = Metrics::new(
             self.ctx.time(),
-            self.cpu_load_rate(),
-            self.average_cpu_load(),
-            self.memory_load_rate(),
-            self.average_memory_load(),
+            self.average_cpu_allocated(),
+            self.average_memory_allocated(),
+            self.cpu_allocated_load_rate(),
+            self.memory_allocated_load_rate(),
+            self.average_cpu_used(),
+            self.average_memory_used(),
+            self.cpu_used_load_rate(),
+            self.memory_used_load_rate(),
         );
         self.metrics_logger.log_metrics(metrics);
     }
@@ -213,7 +259,9 @@ impl EventHandler for APIServer {
                 self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
             }
             PodRemoveRequest { pod_id } => {
-                self.metrics_server.clone().unwrap().borrow_mut().clear_pod_statistics(pod_id);
+                if self.metrics_server.is_some() {
+                    self.metrics_server.clone().unwrap().borrow_mut().clear_pod_statistics(pod_id);
+                }
                 let node_id = self.pod_to_node_map.get(&pod_id);
                 if node_id.is_some() {
                     self.working_nodes.get(node_id.unwrap()).unwrap().borrow_mut().remove_pod(pod_id);

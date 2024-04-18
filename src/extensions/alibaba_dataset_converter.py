@@ -47,8 +47,10 @@ if __name__ == "__main__":
     with open(os.path.join(args.input, "container_usage.csv")) as resource_trace_file:
         reader = csv.reader(resource_trace_file)
         for row in reader:
-            pod_id = row[0]
+            pod_id = row[1]
             if pod_id not in pods:
+                continue
+            if row[2] == '' or row[3] == '':
                 continue
 
             if pod_id not in cpu_trace:
@@ -65,7 +67,7 @@ if __name__ == "__main__":
             })
             memory_trace[pod_id].append({
                 "timestamp": timestamp,
-                "value": float(row[2]) / 100 * requested_memory
+                "value": float(row[3]) / 100 * requested_memory
             })
 
     for pod_id in cpu_trace:

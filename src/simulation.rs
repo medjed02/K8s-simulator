@@ -74,8 +74,8 @@ impl K8sSimulation {
                 let node_ctx = sim.create_context(&name);
                 let cpu = sim_config.default_node.cpu;
                 let memory = sim_config.default_node.memory;
-                let node = rc!(refcell!(Node::new(cpu, memory, 0.0, 0.0,
-                    NodeState::Working, api_server.clone(), node_ctx, sim_config.clone())));
+                let node = rc!(refcell!(Node::new(cpu, memory, NodeState::Working,
+                    api_server.clone(), node_ctx, sim_config.clone())));
                 cloud_nodes_pool.push(node.clone());
                 sim.add_handler(name, node.clone());
             }
@@ -171,7 +171,7 @@ impl K8sSimulation {
         self.last_node_id += 1;
         let name = format!("node_{}", self.last_node_id);
         let node_ctx = self.sim.create_context(&name);
-        let node = rc!(refcell!(Node::new(cpu_total, memory_total, 0.0, 0.0, NodeState::Working,
+        let node = rc!(refcell!(Node::new(cpu_total, memory_total, NodeState::Working,
             self.api_server.clone(), node_ctx, self.sim_config.clone())));
         let node_id = node.borrow().id;
         self.sim.add_handler(name, node.clone());
@@ -246,24 +246,44 @@ impl K8sSimulation {
         }
     }
 
-    /// Returns the average CPU load across all working nodes.
-    pub fn average_cpu_load(&self) -> f64 {
-        self.api_server.borrow().average_cpu_load()
+    /// Returns the average allocated CPU across all working nodes.
+    pub fn average_cpu_allocated(&self) -> f64 {
+        self.api_server.borrow().average_cpu_allocated()
     }
 
-    /// Returns the average memory load across all working nodes.
-    pub fn average_memory_load(&self) -> f64 {
-        self.api_server.borrow().average_memory_load()
+    /// Returns the average allocated memory across all working nodes.
+    pub fn average_memory_allocated(&self) -> f64 {
+        self.api_server.borrow().average_cpu_allocated()
     }
 
-    /// Returns the current CPU load rate (% of overall CPU used).
-    pub fn cpu_load_rate(&self) -> f64 {
-        self.api_server.borrow().cpu_load_rate()
+    /// Returns the current allocated CPU load rate (% of overall CPU used).
+    pub fn cpu_allocated_load_rate(&self) -> f64 {
+        self.api_server.borrow().cpu_allocated_load_rate()
     }
 
-    /// Returns the current memory load rate (% of overall RAM used).
-    pub fn memory_load_rate(&self) -> f64 {
-        self.api_server.borrow().memory_load_rate()
+    /// Returns the current allocated memory load rate (% of overall RAM used).
+    pub fn memory_allocated_load_rate(&self) -> f64 {
+        self.api_server.borrow().memory_allocated_load_rate()
+    }
+
+    /// Returns the average used CPU across all working nodes.
+    pub fn average_cpu_used(&self) -> f64 {
+        self.api_server.borrow().average_cpu_used()
+    }
+
+    /// Returns the average used memory across all working nodes.
+    pub fn average_memory_used(&self) -> f64 {
+        self.api_server.borrow().average_memory_used()
+    }
+
+    /// Returns the current used CPU load rate (% of overall CPU used).
+    pub fn cpu_used_load_rate(&self) -> f64 {
+        self.api_server.borrow().cpu_used_load_rate()
+    }
+
+    /// Returns the current used memory load rate (% of overall RAM used).
+    pub fn memory_used_load_rate(&self) -> f64 {
+        self.api_server.borrow().memory_used_load_rate()
     }
 
     pub fn finish_simulation(&self, path: &str) -> Result<(), std::io::Error> {

@@ -5,21 +5,31 @@ use serde::Serialize;
 #[derive(Serialize)]
 pub struct Metrics {
     pub timestamp: f64,
-    pub cpu_load_rate: f64,
-    pub cpu_average_load: f64,
-    pub memory_load_rate: f64,
-    pub memory_average_load: f64,
+    pub average_cpu_allocated: f64,
+    pub average_memory_allocated: f64,
+    pub cpu_allocated_load_rate: f64,
+    pub memory_allocated_load_rate: f64,
+    pub average_cpu_used: f64,
+    pub average_memory_used: f64,
+    pub cpu_used_load_rate: f64,
+    pub memory_used_load_rate: f64,
 }
 
 impl Metrics {
-    pub fn new(timestamp: f64, cpu_load_rate: f64, cpu_average_load: f64,
-               memory_load_rate: f64, memory_average_load: f64) -> Self {
+    pub fn new(timestamp: f64, average_cpu_allocated: f64, average_memory_allocated: f64,
+               cpu_allocated_load_rate: f64, memory_allocated_load_rate: f64,
+               average_cpu_used: f64, average_memory_used: f64,
+               cpu_used_load_rate: f64, memory_used_load_rate: f64) -> Self {
         Self {
             timestamp,
-            cpu_load_rate,
-            cpu_average_load,
-            memory_load_rate,
-            memory_average_load
+            average_cpu_allocated,
+            average_memory_allocated,
+            cpu_allocated_load_rate,
+            memory_allocated_load_rate,
+            average_cpu_used,
+            average_memory_used,
+            cpu_used_load_rate,
+            memory_used_load_rate,
         }
     }
 }
@@ -62,9 +72,15 @@ impl MetricsLogger for StdoutMetricsLogger {
     }
 
     fn log_metrics(&mut self, metrics: Metrics) {
-        println!("Time: {}, CPU load rate: {}, CPU average load: {}, \
-         memory load rate {}, memory average load {}", metrics.timestamp, metrics.cpu_load_rate,
-                 metrics.cpu_average_load, metrics.memory_load_rate, metrics.memory_average_load)
+        println!("Time: {}, allocated CPU load rate: {}, allocated CPU average load: {}, \
+         allocated memory load rate {}, allocated memory average load {}, \
+         used CPU load rate: {}, used CPU average load: {}, \
+         used memory load rate {}, used memory average load {}",
+                 metrics.timestamp,
+                 metrics.cpu_allocated_load_rate, metrics.average_cpu_allocated,
+                 metrics.memory_allocated_load_rate, metrics.average_memory_allocated,
+                 metrics.cpu_used_load_rate, metrics.average_cpu_used,
+                 metrics.memory_used_load_rate, metrics.average_memory_used,)
     }
 
     fn save_log(&mut self, path: &str) -> Result<(), Error> {

@@ -58,8 +58,8 @@ impl ClusterAutoscalerAlgorithm for SimpleClusterAutoscalerAlgorithm {
             let node = working_nodes.get(&node_id);
             if node.is_none() {
                 now_is_needed_nodes.push(*node_id);
-            } else if node.unwrap().borrow().cpu_load != 0.0 ||
-                node.unwrap().borrow().memory_load != 0.0 {
+            } else if node.unwrap().borrow().cpu_allocated != 0.0 ||
+                node.unwrap().borrow().memory_allocated != 0.0 {
                 now_is_needed_nodes.push(*node_id);
             }
         }
@@ -69,7 +69,7 @@ impl ClusterAutoscalerAlgorithm for SimpleClusterAutoscalerAlgorithm {
 
         let mut nodes_to_scale_down = Vec::<u32>::default();
         for (node_id, node) in working_nodes {
-            if node.borrow().cpu_load == 0.0 && node.borrow().memory_load == 0.0 {
+            if node.borrow().cpu_allocated == 0.0 && node.borrow().memory_allocated == 0.0 {
                 let node_in_unneeded = self.node_unneeded_time.get(node_id);
                 if node_in_unneeded.is_none() {
                     self.node_unneeded_time.insert(*node_id, now_time);

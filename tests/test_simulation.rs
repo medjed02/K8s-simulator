@@ -35,20 +35,20 @@ fn test_base_simulation_with_mrp() {
                        Box::new(ConstantLoadModel::new(10.0))
                        , 1.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 4.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 10.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 4.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 10.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 
     k8s_sim.submit_pod(16.0, 10., 16.0, 10., 100,
                        Box::new(ConstantLoadModel::new(16.0)),
                        Box::new(ConstantLoadModel::new(10.0)),
                        1.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 20.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 20.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 20.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 20.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 }
 
 #[test]
@@ -66,20 +66,20 @@ fn test_base_simulation_with_lrp() {
                        Box::new(ConstantLoadModel::new(10.0)),
                        1.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 4.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 10.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 4.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 10.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 
     k8s_sim.submit_pod(4.0, 10., 4.0, 10., 100,
                        Box::new(ConstantLoadModel::new(4.0)),
                        Box::new(ConstantLoadModel::new(10.0)),
                        1.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 4.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 10.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 4.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 10.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 4.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 10.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 4.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 10.0);
 }
 
 #[test]
@@ -93,17 +93,17 @@ fn test_pod_removing() {
                                       Box::new(ConstantLoadModel::new(5.0)),
                                       1.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 
     k8s_sim.remove_pod(pod_id_1);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 }
 
 #[test]
@@ -118,30 +118,30 @@ fn test_node_crashing() {
                        Box::new(ConstantLoadModel::new(5.0)),
                        1.);
     k8s_sim.step_for_duration(30.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 
     k8s_sim.crash_node(node_id_1, 1.0);
     k8s_sim.step_for_duration(30.0);
     assert_eq!(k8s_sim.node(node_id_1).borrow().state, NodeState::Failed);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 0.0);
     assert_eq!(k8s_sim.node(node_id_2).borrow().state, NodeState::Working);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 5.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 5.0);
 
     k8s_sim.recover_node(node_id_1, 1.0);
     k8s_sim.step_for_duration(30.0);
     k8s_sim.crash_node(node_id_2, 1.0);
     k8s_sim.step_for_duration(30.0);
     assert_eq!(k8s_sim.node(node_id_1).borrow().state, NodeState::Working);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 5.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 5.0);
     assert_eq!(k8s_sim.node(node_id_2).borrow().state, NodeState::Failed);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 }
 
 #[test]
@@ -156,19 +156,19 @@ fn base_test_unschedulable_pod() {
                        Box::new(ConstantLoadModel::new(30.0)),
                        1.);
     k8s_sim.step_for_duration(0.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 
     let node_id_3 = k8s_sim.add_node(100, 100.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id_3).borrow().cpu_load, 30.0);
-    assert_eq!(k8s_sim.node(node_id_3).borrow().memory_load, 30.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id_3).borrow().cpu_allocated, 30.0);
+    assert_eq!(k8s_sim.node(node_id_3).borrow().memory_allocated, 30.0);
 }
 
 #[test]
@@ -189,8 +189,8 @@ fn test_cluster_scale_up() {
                        1.);
     k8s_sim.step_for_duration(300.0);
     assert_ne!(k8s_sim.working_nodes().len(), 0);
-    assert_ne!(k8s_sim.cpu_load_rate(), 0.0);
-    assert_ne!(k8s_sim.memory_load_rate(), 0.0);
+    assert_ne!(k8s_sim.cpu_allocated_load_rate(), 0.0);
+    assert_ne!(k8s_sim.memory_allocated_load_rate(), 0.0);
 }
 
 #[test]
@@ -222,11 +222,11 @@ fn test_pod_load_model() {
                        Box::new(IncreaseLoadModel::new(100.0, 10.0, 30.0)),
                                     1.);
     k8s_sim.step_for_duration(20.0);
-    assert!(k8s_sim.node(node_id).borrow().cpu_load < 8.0);
-    assert!(k8s_sim.node(node_id).borrow().memory_load < 20.0);
+    assert!(k8s_sim.node(node_id).borrow().cpu_allocated < 8.0);
+    assert!(k8s_sim.node(node_id).borrow().memory_allocated < 20.0);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().cpu_load, 8.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().memory_load, 20.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().cpu_allocated, 8.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().memory_allocated, 20.0);
     k8s_sim.remove_pod(pod_id);
     k8s_sim.step_for_duration(100.0);
 
@@ -235,16 +235,16 @@ fn test_pod_load_model() {
                                     Box::new(DecreaseLoadModel::new(100.0, 20.0, 0.0)),
                                     1.);
     k8s_sim.step_for_duration(20.0);
-    assert!(k8s_sim.node(node_id).borrow().cpu_load > 4.0);
-    assert!(k8s_sim.node(node_id).borrow().memory_load > 10.0);
+    assert!(k8s_sim.node(node_id).borrow().cpu_allocated > 4.0);
+    assert!(k8s_sim.node(node_id).borrow().memory_allocated > 10.0);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().cpu_load, 4.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().memory_load, 10.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().cpu_allocated, 4.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().memory_allocated, 10.0);
     k8s_sim.remove_pod(pod_id);
     k8s_sim.step_for_duration(100.0);
 
-    assert_eq!(k8s_sim.node(node_id).borrow().cpu_load, 0.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().memory_load, 0.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().cpu_allocated, 0.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().memory_allocated, 0.0);
 }
 
 #[test]
@@ -262,12 +262,12 @@ fn test_vertical_autoscaler() {
                        Box::new(ConstantLoadModel::new(1.0)),
                                     1.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().cpu_load, 10.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().memory_load, 10.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().cpu_allocated, 10.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().memory_allocated, 10.0);
 
     k8s_sim.step_for_duration(40000.0);
-    assert!(k8s_sim.node(node_id).borrow().cpu_load < 2.0);
-    assert!(k8s_sim.node(node_id).borrow().memory_load < 2.0);
+    assert!(k8s_sim.node(node_id).borrow().cpu_allocated < 2.0);
+    assert!(k8s_sim.node(node_id).borrow().memory_allocated < 2.0);
 
     k8s_sim.remove_pod(pod_id);
     let pod_id = k8s_sim.submit_pod(10.0, 10.0, 15.0, 15.0, 100,
@@ -275,8 +275,8 @@ fn test_vertical_autoscaler() {
                                     Box::new(ConstantLoadModel::new(12.0)),
                                     1.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().cpu_load, 12.0);
-    assert_eq!(k8s_sim.node(node_id).borrow().memory_load, 12.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().cpu_allocated, 12.0);
+    assert_eq!(k8s_sim.node(node_id).borrow().memory_allocated, 12.0);
 
     k8s_sim.step_for_duration(40000.0);
     assert!(k8s_sim.node(node_id).borrow().pods.get(&pod_id).unwrap().requested_cpu > 10.0);
@@ -323,10 +323,10 @@ fn test_create_deployment() {
                                                   Box::new(ConstantLoadModel::new(10.0)),
                                                   2, 1.);
     k8s_sim.step_for_duration(100.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 10.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 10.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 10.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 10.0);
 }
 
 #[test]
@@ -351,8 +351,8 @@ fn test_horizontal_autoscaler() {
                               1, 1.);
     k8s_sim.step_for_duration(1000.0);
 
-    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_load, 10.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_load, 5.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_load, 10.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 10.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 5.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 10.0);
 }
