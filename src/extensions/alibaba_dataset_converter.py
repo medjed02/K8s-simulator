@@ -60,7 +60,7 @@ if __name__ == "__main__":
             requested_cpu = pods[pod_id]["requested_cpu"]
             requested_memory = pods[pod_id]["requested_memory"]
 
-            timestamp = float(row[0])
+            timestamp = float(row[0]) - pods[pod_id]["timestamp"]
             cpu_trace[pod_id].append({
                 "timestamp": timestamp,
                 "value": float(row[2]) / 100 * requested_cpu
