@@ -18,8 +18,7 @@ impl SchedulerAlgorithm for LRPAlgorithm {
     fn filter(&self, pod: &Pod, nodes: &BTreeMap<u32, Rc<RefCell<Node>>>) -> Vec<u32> {
         let mut filtered_nodes = Vec::<u32>::default();
         for (node_id, node) in nodes.into_iter() {
-            if node.borrow().get_free_cpu() >= pod.requested_cpu &&
-                node.borrow().get_free_memory() >= pod.requested_memory {
+            if node.borrow().can_place_pod(pod.requested_cpu, pod.requested_memory) {
                 filtered_nodes.push(*node_id);
             }
         }
@@ -32,7 +31,7 @@ impl SchedulerAlgorithm for LRPAlgorithm {
         for node_id in filtered_node_ids {
             let node = nodes.get(node_id).unwrap().borrow();
             let cpu_utilization = ((node.cpu_allocated + pod.requested_cpu) as f64) / (node.cpu_total as f64);
-            let memory_utilization = (node.memory_allocated + pod.requested_memory) / (node.memory_total as f64);
+            let memory_utilization = (node.memory_allocated + pod.requested_memory) / node.memory_total;
             scores.push((10.0 * (1.0 - cpu_utilization) + 10.0 * (1.0 - memory_utilization)) / 2.0);
         }
         scores

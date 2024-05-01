@@ -17,8 +17,8 @@ fn main() {
                                          sim_config,
                                          Box::new(MRPAlgorithm::new()),
                                          None,
-                                         Some(Box::new(AutoVerticalAutoscalerAlgorithm::new(RequestsOnly))),
+                                         None,
                                          None);
     k8s_sim.step_for_duration(100000.);
-    k8s_sim.finish_simulation("./results_with_vpa.json").unwrap();
+    k8s_sim.finish_simulation("./results_without_vpa.json").unwrap();
 }

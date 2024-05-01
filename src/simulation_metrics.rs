@@ -13,13 +13,16 @@ pub struct Metrics {
     pub average_memory_used: f64,
     pub cpu_used_load_rate: f64,
     pub memory_used_load_rate: f64,
+    pub pod_migration_count: u64,
+    pub memory_overuse_count: u64,
 }
 
 impl Metrics {
     pub fn new(timestamp: f64, average_cpu_allocated: f64, average_memory_allocated: f64,
                cpu_allocated_load_rate: f64, memory_allocated_load_rate: f64,
                average_cpu_used: f64, average_memory_used: f64,
-               cpu_used_load_rate: f64, memory_used_load_rate: f64) -> Self {
+               cpu_used_load_rate: f64, memory_used_load_rate: f64,
+               pod_migration_count: u64, memory_overuse_count: u64) -> Self {
         Self {
             timestamp,
             average_cpu_allocated,
@@ -30,6 +33,8 @@ impl Metrics {
             average_memory_used,
             cpu_used_load_rate,
             memory_used_load_rate,
+            pod_migration_count,
+            memory_overuse_count,
         }
     }
 }
@@ -75,12 +80,14 @@ impl MetricsLogger for StdoutMetricsLogger {
         println!("Time: {}, allocated CPU load rate: {}, allocated CPU average load: {}, \
          allocated memory load rate {}, allocated memory average load {}, \
          used CPU load rate: {}, used CPU average load: {}, \
-         used memory load rate {}, used memory average load {}",
+         used memory load rate {}, used memory average load {},\
+         pod migration cnt: {}, memory overuse count: {}",
                  metrics.timestamp,
                  metrics.cpu_allocated_load_rate, metrics.average_cpu_allocated,
                  metrics.memory_allocated_load_rate, metrics.average_memory_allocated,
                  metrics.cpu_used_load_rate, metrics.average_cpu_used,
-                 metrics.memory_used_load_rate, metrics.average_memory_used,)
+                 metrics.memory_used_load_rate, metrics.average_memory_used,
+                 metrics.pod_migration_count, metrics.memory_overuse_count)
     }
 
     fn save_log(&mut self, path: &str) -> Result<(), Error> {

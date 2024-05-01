@@ -5,11 +5,10 @@ use std::fmt::{Display, Formatter};
 use dslab_core::context::SimulationContext;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::slice::IterMut;
 use dslab_core::{cast, Event, EventHandler};
 use serde::Serialize;
 use crate::api_server::APIServer;
-use crate::events::assigning::{PodAssigningRequest, PodMigrationSucceeded, PodPlacementFailed, PodPlacementRequest, PodPlacementSucceeded};
+use crate::events::assigning::{PodAssigningRequest, PodMigrationRequest, PodMigrationSucceeded, PodPlacementFailed, PodPlacementRequest, PodPlacementSucceeded};
 use crate::events::node::UpdatePodsResources;
 use crate::events::pod::PodRequestAndLimitsChange;
 use crate::pod::Pod;
@@ -43,8 +42,10 @@ pub struct Node {
     pub memory_used: f64,
     pub state: NodeState,
     pub pods: HashMap<u64, Pod>,
-    pub api_server: Rc<RefCell<APIServer>>,
 
+    pub memory_overuse_count: u64,
+
+    pub api_server: Rc<RefCell<APIServer>>,
     ctx: SimulationContext,
     sim_config: Rc<SimulationConfig>,
 }
@@ -69,6 +70,7 @@ impl Node {
             memory_used: 0.0,
             state,
             pods: HashMap::new(),
+            memory_overuse_count: 0,
             api_server,
             ctx,
             sim_config
@@ -92,17 +94,17 @@ impl Node {
     }
 
     pub fn add_pod(&mut self, mut pod: Pod) -> Option<Pod> {
-        if self.get_free_cpu() < pod.requested_cpu || self.get_free_memory() < pod.requested_memory {
+        let wanted_memory=  pod.get_wanted_memory(self.ctx.time()).min(pod.limit_memory);
+        if self.get_free_cpu() < pod.requested_cpu || self.get_free_memory() < wanted_memory {
             return Some(pod);
         }
+
         pod.start_time = self.ctx.time();
 
         pod.cpu = pod.get_wanted_cpu(self.ctx.time())
             .min(pod.limit_cpu as f64)
             .min(self.get_free_cpu() as f64) as f32;
-        pod.memory =  pod.get_wanted_memory(self.ctx.time())
-            .min(pod.limit_memory)
-            .min(self.get_free_memory());
+        pod.memory = wanted_memory;
 
 
         self.cpu_used += pod.cpu;
@@ -114,8 +116,12 @@ impl Node {
         None
     }
 
-    pub fn remove_pod(&mut self, pod_id: u64) -> Pod {
-        let pod = self.pods.get(&pod_id).unwrap();
+    pub fn remove_pod(&mut self, pod_id: u64) -> Option<Pod> {
+        let pod = self.pods.get(&pod_id);
+        if pod.is_none() {
+            return None;
+        }
+        let pod = pod.unwrap();
 
         self.cpu_used -= pod.cpu;
         self.memory_used -= pod.memory;
@@ -125,11 +131,30 @@ impl Node {
         let mut pod = self.pods.remove(&pod_id).unwrap();
         pod.cpu = 0.0;
         pod.memory = 0.0;
-        pod
+        Some(pod)
     }
 
-    pub fn update_pods_resources(&mut self) {
+    pub fn can_place_pod(&self, requested_cpu: f32, requested_memory: f64) -> bool {
+        self.get_free_cpu() >= requested_cpu && self.get_free_memory() >= requested_memory &&
+            !self.is_under_pressure(self.memory_allocated + requested_memory)
+    }
+
+    fn update_pods_resources(&mut self) {
+        let mut pods_to_evict = Vec::default();
         for (_, pod) in self.pods.iter_mut() {
+            let wanted_memory = pod.get_wanted_memory(self.ctx.time()).min(pod.limit_memory);
+            if wanted_memory > pod.requested_memory {
+                self.memory_overuse_count += 1;
+            }
+            let free_memory = (self.memory_total as f64) - self.memory_allocated;
+            if wanted_memory - pod.memory.max(pod.requested_memory) > free_memory {
+                pods_to_evict.push(pod.id);
+                continue;
+            } else {
+                self.memory_allocated = self.memory_allocated - pod.memory.max(pod.requested_memory) + wanted_memory.max(pod.requested_memory);
+                self.memory_used = self.memory_used - pod.memory + wanted_memory;
+                pod.memory = wanted_memory;
+            }
 
             let wanted_cpu = pod.get_wanted_cpu(self.ctx.time()).min(pod.limit_cpu as f64);
             let free_cpu = (self.cpu_total as f32) - self.cpu_allocated;
@@ -137,14 +162,21 @@ impl Node {
             self.cpu_allocated = self.cpu_allocated - pod.cpu.max(pod.requested_cpu) + new_cpu.max(pod.requested_cpu);
             self.cpu_used = self.cpu_used - pod.cpu + new_cpu;
             pod.cpu = new_cpu;
-
-            let wanted_memory = pod.get_wanted_memory(self.ctx.time()).min(pod.limit_memory);
-            let free_memory = (self.memory_total as f64) - self.memory_allocated;
-            let new_memory = pod.memory + (wanted_memory - pod.memory).min(free_memory);
-            self.memory_allocated = self.memory_allocated - pod.memory.max(pod.requested_memory) + new_memory.max(pod.requested_memory);
-            self.memory_used = self.memory_used - pod.memory + new_memory;
-            pod.memory = new_memory;
         }
+
+        for pod_id in pods_to_evict {
+            self.evict_pod(pod_id);
+        }
+    }
+
+    fn is_under_pressure(&self, memory_allocated: f64) -> bool {
+        memory_allocated >= self.memory_total * self.sim_config.memory_pressure_threshold
+    }
+
+    fn evict_pod(&mut self, pod_id: u64) {
+        let pod = self.remove_pod(pod_id).unwrap();
+        self.ctx.emit(PodMigrationRequest { pod, source_node_id: self.id },
+                      self.api_server.borrow().id, self.sim_config.message_delay);
     }
 }
 
@@ -169,6 +201,11 @@ impl EventHandler for Node {
             PodRequestAndLimitsChange { pod_id, new_requested_cpu, new_limit_cpu,
                 new_requested_memory, new_limit_memory } => {
                 let mut pod = self.remove_pod(pod_id);
+                if pod.is_none() {
+                    return;
+                }
+                let mut pod = pod.unwrap();
+
                 pod.requested_cpu = new_requested_cpu;
                 pod.limit_cpu = new_limit_cpu;
                 pod.requested_memory = new_requested_memory;

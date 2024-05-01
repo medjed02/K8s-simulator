@@ -14,7 +14,7 @@ use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
 use crate::deployment::Deployment;
 use crate::events::node::{AllocateNewDefaultNodes, NodeStatusChanged, RemoveNode};
-use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest, PodPlacementSucceeded, PodPlacementFailed};
+use crate::events::assigning::{PodAssigningRequest, PodAssigningSucceeded, PodAssigningFailed, PodPlacementRequest, PodPlacementSucceeded, PodPlacementFailed, PodMigrationRequest};
 use crate::events::api_server::PodRemoveRequest;
 use crate::events::deployment::{DeploymentCreateRequest, DeploymentHorizontalAutoscaling};
 use crate::events::logger::MetricsSnapshot;
@@ -38,6 +38,7 @@ pub struct APIServer {
     sim_config: Rc<SimulationConfig>,
 
     metrics_logger: Box<dyn MetricsLogger>,
+    pod_migration_count: u64,
 
     pod_counter: u64,
     deployment_counter: u64,
@@ -62,6 +63,7 @@ impl APIServer {
             ctx,
             sim_config,
             metrics_logger,
+            pod_migration_count: 0,
             pod_counter: 0,
             deployment_counter: 0,
         }
@@ -115,6 +117,17 @@ impl APIServer {
         mut_node.memory_used = 0.0;
         drop(mut_node);
         self.failed_nodes.insert(node_id, node);
+    }
+
+    pub fn remove_pod(&mut self, pod_id: u64) {
+        if self.metrics_server.is_some() {
+            self.metrics_server.clone().unwrap().borrow_mut().clear_pod_statistics(pod_id);
+        }
+        let node_id = self.pod_to_node_map.get(&pod_id);
+        if node_id.is_some() {
+            self.working_nodes.get(node_id.unwrap()).unwrap().borrow_mut().remove_pod(pod_id);
+        }
+        self.pod_to_node_map.remove(&pod_id);
     }
 
     /// Get list of working nodes
@@ -202,6 +215,14 @@ impl APIServer {
         sum_memory_load / sum_memory_total
     }
 
+    pub fn memory_overuse_count(&self) -> u64 {
+        let mut memory_overuse_count: u64 = 0;
+        for (_, node) in self.working_nodes.iter() {
+            memory_overuse_count += node.borrow().memory_overuse_count;
+        }
+        memory_overuse_count
+    }
+
     pub fn log_metrics(&mut self) {
         let metrics = Metrics::new(
             self.ctx.time(),
@@ -213,6 +234,8 @@ impl APIServer {
             self.average_memory_used(),
             self.cpu_used_load_rate(),
             self.memory_used_load_rate(),
+            self.pod_migration_count,
+            self.memory_overuse_count(),
         );
         self.metrics_logger.log_metrics(metrics);
     }
@@ -259,13 +282,7 @@ impl EventHandler for APIServer {
                 self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
             }
             PodRemoveRequest { pod_id } => {
-                if self.metrics_server.is_some() {
-                    self.metrics_server.clone().unwrap().borrow_mut().clear_pod_statistics(pod_id);
-                }
-                let node_id = self.pod_to_node_map.get(&pod_id);
-                if node_id.is_some() {
-                    self.working_nodes.get(node_id.unwrap()).unwrap().borrow_mut().remove_pod(pod_id);
-                }
+                self.remove_pod(pod_id);
             }
             RemoveNode { node_id } => {
                 self.remove_node(node_id);
@@ -311,6 +328,11 @@ impl EventHandler for APIServer {
                 if self.metrics_logger.snapshot_period() > 0.0 {
                     self.ctx.emit(MetricsSnapshot {}, self.id, self.metrics_logger.snapshot_period());
                 }
+            }
+            PodMigrationRequest { pod, source_node_id } => {
+                self.pod_migration_count += 1;
+                self.remove_pod(pod.id);
+                self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
             }
         })
     }

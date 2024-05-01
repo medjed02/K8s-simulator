@@ -42,7 +42,7 @@ pub mod assigning {
 
     #[derive(Clone, Serialize)]
     pub struct PodMigrationRequest {
-        pub pod_id: u64,
+        pub pod: Pod,
         pub source_node_id: u32,
     }
 
