@@ -27,8 +27,8 @@ fn get_default_simulation_with_mrp() -> K8sSimulation {
 #[test]
 fn test_base_simulation_with_mrp() {
     let mut k8s_sim = get_default_simulation_with_mrp();
-    let node_id_1 = k8s_sim.add_node(20, 20.);
-    let node_id_2 = k8s_sim.add_node(20, 20.);
+    let node_id_1 = k8s_sim.add_node(20., 20.);
+    let node_id_2 = k8s_sim.add_node(20., 20.);
 
     k8s_sim.submit_pod(4.0, 10., 4.0, 10., 100,
                        Box::new(ConstantLoadModel::new(4.0)),
@@ -58,8 +58,8 @@ fn test_base_simulation_with_lrp() {
     let mut k8s_sim = K8sSimulation::new(sim, Box::new(EmptyMetricsLogger {}), Box::new(StdoutLogger::new()),
                                          sim_config, Box::new(LRPAlgorithm::new()), None, None, None);
 
-    let node_id_1 = k8s_sim.add_node(20, 20.);
-    let node_id_2 = k8s_sim.add_node(20, 20.);
+    let node_id_1 = k8s_sim.add_node(20., 20.);
+    let node_id_2 = k8s_sim.add_node(20., 20.);
 
     k8s_sim.submit_pod(4.0, 5., 4.0, 5., 100,
                        Box::new(ConstantLoadModel::new(4.0)),
@@ -85,8 +85,8 @@ fn test_base_simulation_with_lrp() {
 #[test]
 fn test_pod_removing() {
     let mut k8s_sim = get_default_simulation_with_mrp();
-    let node_id_1 = k8s_sim.add_node(20, 20.);
-    let node_id_2 = k8s_sim.add_node(20, 20.);
+    let node_id_1 = k8s_sim.add_node(20., 20.);
+    let node_id_2 = k8s_sim.add_node(20., 20.);
 
     let pod_id_1 = k8s_sim.submit_pod(5.0, 5.0, 5.0, 5.0, 100,
                                       Box::new(ConstantLoadModel::new(5.0)),
@@ -110,8 +110,8 @@ fn test_pod_removing() {
 fn test_node_crashing() {
     let mut k8s_sim = get_default_simulation_with_mrp();
 
-    let node_id_1 = k8s_sim.add_node(20, 20.);
-    let node_id_2 = k8s_sim.add_node(20, 20.);
+    let node_id_1 = k8s_sim.add_node(20., 20.);
+    let node_id_2 = k8s_sim.add_node(20., 20.);
 
     k8s_sim.submit_pod(5.0, 5.0, 5.0, 5.0, 100,
                        Box::new(ConstantLoadModel::new(5.0)),
@@ -148,8 +148,8 @@ fn test_node_crashing() {
 fn base_test_unschedulable_pod() {
     let mut k8s_sim = get_default_simulation_with_mrp();
 
-    let node_id_1 = k8s_sim.add_node(20, 20.);
-    let node_id_2 = k8s_sim.add_node(20, 20.);
+    let node_id_1 = k8s_sim.add_node(20., 20.);
+    let node_id_2 = k8s_sim.add_node(20., 20.);
 
     k8s_sim.submit_pod(30.0, 30.0, 30.0, 30.0, 100,
                        Box::new(ConstantLoadModel::new(30.0)),
@@ -161,7 +161,7 @@ fn base_test_unschedulable_pod() {
     assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 0.0);
     assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 0.0);
 
-    let node_id_3 = k8s_sim.add_node(100, 100.);
+    let node_id_3 = k8s_sim.add_node(100., 100.);
     k8s_sim.step_for_duration(100.0);
     assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 0.0);
     assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 0.0);
@@ -204,7 +204,7 @@ fn test_cluster_scale_down() {
                                              10,
                                              300.0
                                          ))), None, None);
-    let node_id_1 = k8s_sim.add_node(20, 20.);
+    let node_id_1 = k8s_sim.add_node(20., 20.);
     assert_ne!(k8s_sim.working_nodes().len(), 0);
 
     k8s_sim.step_for_duration(700.0);
@@ -215,7 +215,7 @@ fn test_cluster_scale_down() {
 #[test]
 fn test_pod_load_model() {
     let mut k8s_sim = get_default_simulation_with_mrp();
-    let node_id = k8s_sim.add_node(20, 20.);
+    let node_id = k8s_sim.add_node(20., 20.);
 
     let pod_id = k8s_sim.submit_pod(4.0, 10., 8.0, 20., 100,
                        Box::new(IncreaseLoadModel::new(100.0, 4.0, 10.0)),
@@ -256,7 +256,7 @@ fn test_vertical_autoscaler() {
                                          None,
                                          Some(Box::new(AutoVerticalAutoscalerAlgorithm::new(RequestsAndLimits))),
                                          None);
-    let node_id = k8s_sim.add_node(20, 20.);
+    let node_id = k8s_sim.add_node(20., 20.);
     let pod_id = k8s_sim.submit_pod(10.0, 10.0, 10.0, 10.0, 100,
                        Box::new(ConstantLoadModel::new(1.0)),
                        Box::new(ConstantLoadModel::new(1.0)),
@@ -293,7 +293,7 @@ fn test_performance() {
                                          Some(Box::new(AutoVerticalAutoscalerAlgorithm::new(RequestsAndLimits))),
                                          None);
     for _ in 0..1000 {
-        k8s_sim.add_node(20, 20.);
+        k8s_sim.add_node(20., 20.);
     }
 
     for _ in 0..10000 {
@@ -315,8 +315,8 @@ fn test_create_deployment() {
     let mut k8s_sim = K8sSimulation::new(sim, Box::new(EmptyMetricsLogger {}), Box::new(StdoutLogger::new()),
                                          sim_config, Box::new(LRPAlgorithm::new()), None, None, None);
 
-    let node_id_1 = k8s_sim.add_node(5, 20.);
-    let node_id_2 = k8s_sim.add_node(5, 20.);
+    let node_id_1 = k8s_sim.add_node(5., 20.);
+    let node_id_2 = k8s_sim.add_node(5., 20.);
 
     let deployment_id = k8s_sim.submit_deployment(5., 10., 5., 10., 100,
                                                   Box::new(ConstantLoadModel::new(5.0)),
@@ -342,8 +342,8 @@ fn test_horizontal_autoscaler() {
     let mut k8s_sim = K8sSimulation::new(sim, Box::new(EmptyMetricsLogger {}), Box::new(StdoutLogger::new()),
                                          sim_config, Box::new(LRPAlgorithm::new()),
                                          None, None, Some(horizontal_autoscaler));
-    let node_id_1 = k8s_sim.add_node(5, 20.);
-    let node_id_2 = k8s_sim.add_node(5, 20.);
+    let node_id_1 = k8s_sim.add_node(5., 20.);
+    let node_id_2 = k8s_sim.add_node(5., 20.);
 
     k8s_sim.submit_deployment(5., 10., 5., 10., 100,
                               Box::new(ConstantLoadModel::new(2.5)),

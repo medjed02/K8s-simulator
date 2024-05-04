@@ -3,7 +3,7 @@ use crate::load_model::{ConstantLoadModel, LoadModel, ResourceSnapshot, TraceLoa
 
 #[derive(Clone)]
 pub struct NodeRequest {
-    pub cpu: u32,
+    pub cpu: f32,
     pub memory: f64,
 }
 
@@ -38,7 +38,7 @@ impl DatasetReader {
         for event in raw_json.iter() {
             if event["type"] == "ADD_NODE" {
                 self.node_requests.push(NodeRequest {
-                    cpu: event["cpu"].as_u64().unwrap() as u32,
+                    cpu: event["cpu"].as_f64().unwrap() as f32,
                     memory: event["memory"].as_f64().unwrap(),
                 })
             } else if event["type"] == "SUBMIT_POD" {

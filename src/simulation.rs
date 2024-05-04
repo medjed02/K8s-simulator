@@ -167,7 +167,7 @@ impl K8sSimulation {
     }
 
     /// Add new node to the k8s cluster, return node_id
-    pub fn add_node(&mut self, cpu_total: u32, memory_total: f64) -> u32 {
+    pub fn add_node(&mut self, cpu_total: f32, memory_total: f64) -> u32 {
         self.last_node_id += 1;
         let name = format!("node_{}", self.last_node_id);
         let node_ctx = self.sim.create_context(&name);

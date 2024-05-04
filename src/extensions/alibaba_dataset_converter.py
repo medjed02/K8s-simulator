@@ -15,7 +15,7 @@ if __name__ == "__main__":
         for row in reader:
             if row[2] != "add":
                 continue
-            cpu = int(row[4])
+            cpu = float(row[4])
             memory = float(row[5])
             nodes.append((cpu, memory))
 

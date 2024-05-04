@@ -10,7 +10,7 @@ use K8s_simulator::simulation_metrics::{EmptyMetricsLogger, FileMetricsLogger};
 
 fn main() {
     let sim = Simulation::new(42);
-    let sim_config = SimulationConfig::from_file("/home/medjed02/K8s-simulator/test-configs/alibaba_config.yaml");
+    let sim_config = SimulationConfig::from_file("/home/medjed02/K8s-simulator/test-configs/google_config.yaml");
     let mut k8s_sim = K8sSimulation::new(sim,
                                          Box::new(FileMetricsLogger::new(60.)),
                                          Box::new(StdoutLogger::new()),
@@ -19,6 +19,6 @@ fn main() {
                                          None,
                                          None,
                                          None);
-    k8s_sim.step_for_duration(100000.);
+    k8s_sim.step_for_duration(270000.);
     k8s_sim.finish_simulation("./results_without_vpa.json").unwrap();
 }

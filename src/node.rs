@@ -14,7 +14,7 @@ use crate::events::pod::PodRequestAndLimitsChange;
 use crate::pod::Pod;
 use crate::simulation_config::SimulationConfig;
 
-const UPDATE_PODS_RESOURCES_PERIOD: f64 = 10.0;
+const UPDATE_PODS_RESOURCES_PERIOD: f64 = 300.0;
 
 /// Node state (for imitation crash of the node)
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -34,7 +34,7 @@ impl Display for NodeState {
 
 pub struct Node {
     pub id: u32,
-    pub cpu_total: u32,
+    pub cpu_total: f32,
     pub memory_total: f64,
     pub cpu_allocated: f32,
     pub memory_allocated: f64,
@@ -52,7 +52,7 @@ pub struct Node {
 
 impl Node {
     pub fn new(
-        cpu_total: u32,
+        cpu_total: f32,
         memory_total: f64,
         state: NodeState,
         api_server: Rc<RefCell<APIServer>>,

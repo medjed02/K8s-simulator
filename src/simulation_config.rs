@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 pub struct NodeConfig {
     /// Node CPU capacity.
-    pub cpu: u32,
+    pub cpu: f32,
     /// Node memory capacity in GB.
     pub memory: f64,
     /// Number of such nodes.
@@ -14,7 +14,7 @@ pub struct NodeConfig {
 }
 
 impl NodeConfig {
-    pub fn new(cpu: u32, memory: f64, count: u32) -> Self {
+    pub fn new(cpu: f32, memory: f64, count: u32) -> Self {
         Self {
             cpu,
             memory,
@@ -137,7 +137,7 @@ impl SimulationConfig {
             pod_initial_backoff_duration,
             pod_max_backoff_duration,
             cluster_autoscaler_scan_interval: 10.0,
-            default_node: NodeConfig::new(8, 64., 1),
+            default_node: NodeConfig::new(8., 64., 1),
             default_node_allocation_time: 120.0,
             cloud_nodes_count: 100,
             metrics_server_interval: 30.0,
@@ -163,7 +163,7 @@ impl SimulationConfig {
             pod_initial_backoff_duration: raw.pod_initial_backoff_duration.unwrap_or(1.0),
             pod_max_backoff_duration: raw.pod_max_backoff_duration.unwrap_or(10.0),
             cluster_autoscaler_scan_interval: raw.cluster_autoscaler_scan_interval.unwrap_or(10.0),
-            default_node: raw.default_node.unwrap_or(NodeConfig::new(8, 64., 1)),
+            default_node: raw.default_node.unwrap_or(NodeConfig::new(8., 64., 1)),
             default_node_allocation_time: raw.default_node_allocation_time.unwrap_or(120.0),
             cloud_nodes_count: raw.cloud_nodes_count.unwrap_or(100),
             metrics_server_interval: raw.metrics_server_interval.unwrap_or(30.0),
