@@ -176,6 +176,7 @@ if __name__ == "__main__":
     parser.add_argument('--time', type=float, help='Time in days (from start of the dataset)')
     parser.add_argument('--mperiod', type=float, help='Period of measurement of pod\'s resources (in '
                                                                  'seconds)')
+    parser.add_argument('--deployments', type=float, help='Part of deployments (from all pod\'s count)')
     args = parser.parse_args()
 
     print("read nodes")
@@ -196,7 +197,11 @@ if __name__ == "__main__":
         })
     for pod_id in pods:
         pod = pods[pod_id]
-        pod["type"] = "SUBMIT_POD"
+        if random.random() < args.deployments:
+            pod["type"] = "SUBMIT_DEPLOYMENT"
+            pod["cnt_replicas"] = 1
+        else:
+            pod["type"] = "SUBMIT_POD"
         output_trace.append(pod)
     with open("google_trace.json", "w+") as output_file:
         json.dump(output_trace, output_file)

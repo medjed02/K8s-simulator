@@ -156,10 +156,19 @@ impl K8sSimulation {
             }
 
             while !dataset.pod_requests.is_empty() {
-                let mut pod = dataset.pod_requests.pop().unwrap();
+                let pod = dataset.pod_requests.pop().unwrap();
                 sim.submit_pod(pod.requested_cpu, pod.requested_memory,
                                pod.limit_cpu, pod.limit_memory, pod.priority_weight,
                                pod.cpu_load_model, pod.memory_load_model, pod.timestamp);
+            }
+
+            while !dataset.deployment_requests.is_empty() {
+                let deployment = dataset.deployment_requests.pop().unwrap();
+                sim.submit_deployment(deployment.requested_cpu, deployment.requested_memory,
+                                      deployment.limit_cpu, deployment.limit_memory,
+                                      deployment.priority_weight,
+                                      deployment.cpu_load_model, deployment.memory_load_model,
+                                      deployment.cnt_replicas, deployment.timestamp);
             }
         }
 

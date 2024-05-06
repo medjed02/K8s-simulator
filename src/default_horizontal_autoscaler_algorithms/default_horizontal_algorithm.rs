@@ -65,7 +65,7 @@ impl HorizontalAutoscalerAlgorithm for ResourcesHorizontalAutoscalerAlgorithm {
             ControlledResources::MemoryOnly { memory_utilization } => {
                 let target_memory_utilization = memory_utilization.unwrap_or(1.);
                 let target_memory = deployment.pod_template.requested_memory * target_memory_utilization;
-                new_cnt_replicas = new_cnt_replicas.max((target_memory / average_memory).ceil() as u64);
+                new_cnt_replicas = new_cnt_replicas.max((average_memory / target_memory).ceil() as u64);
             },
             ControlledResources::CPUAndMemory { cpu_utilization, memory_utilization } => {
                 let target_cpu_utilization = cpu_utilization.unwrap_or(1.);

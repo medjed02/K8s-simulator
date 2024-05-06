@@ -2,11 +2,13 @@ import argparse
 import csv
 import json
 import os.path
+import random
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--input', type=str, help='Path of directory with alibaba dataset (2017)')
     parser.add_argument('--output', type=str, help='Path of file with result')
+    parser.add_argument('--deployments', type=float, help='Part of deployments (from all pod\'s count)')
     args = parser.parse_args()
 
     nodes = list()
@@ -94,7 +96,11 @@ if __name__ == "__main__":
 
     for pod_id in pods:
         pod = pods[pod_id]
-        pod["type"] = "SUBMIT_POD"
+        if random.random() < args.deployments:
+            pod["type"] = "SUBMIT_DEPLOYMENT"
+            pod["cnt_replicas"] = 1
+        else:
+            pod["type"] = "SUBMIT_POD"
         output_trace.append(pod)
 
     with open(args.output, "w+") as output_file:
