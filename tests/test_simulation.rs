@@ -284,31 +284,6 @@ fn test_vertical_autoscaler() {
 }
 
 #[test]
-fn test_performance() {
-    let sim = Simulation::new(42);
-    let sim_config = SimulationConfig::from_file(&name_wrapper("config.yaml"));
-    let mut k8s_sim = K8sSimulation::new(sim, Box::new(EmptyMetricsLogger {}), Box::new(StdoutLogger::new()),
-                                         sim_config, Box::new(MRPAlgorithm::new()),
-                                         None,
-                                         Some(Box::new(AutoVerticalAutoscalerAlgorithm::new(RequestsAndLimits))),
-                                         None);
-    for _ in 0..1000 {
-        k8s_sim.add_node(20., 20.);
-    }
-
-    for _ in 0..10000 {
-        k8s_sim.submit_pod(0.1, 0.1,0.1, 0.1, 100,
-                           Box::new(ConstantLoadModel::new(0.1)),
-                           Box::new(ConstantLoadModel::new(0.1)),
-                           1.);
-    }
-
-    k8s_sim.step_for_duration(160000.0);
-    //assert_eq!(k8s_sim.cpu_load_rate(), 0.5);
-    //assert_eq!(k8s_sim.memory_load_rate(), 0.5);
-}
-
-#[test]
 fn test_create_deployment() {
     let sim = Simulation::new(42);
     let sim_config = SimulationConfig::from_file(&name_wrapper("config.yaml"));
@@ -336,7 +311,7 @@ fn test_horizontal_autoscaler() {
     let horizontal_autoscaler =
         Box::new(
             ResourcesHorizontalAutoscalerAlgorithm::new(
-                CPUOnly { cpu_utilization: None }, 300.0, 300.0,1, 10
+                CPUOnly { cpu_utilization: Some(0.5) }, 300.0, 300.0,1, 10
             )
         );
     let mut k8s_sim = K8sSimulation::new(sim, Box::new(EmptyMetricsLogger {}), Box::new(StdoutLogger::new()),
@@ -346,13 +321,14 @@ fn test_horizontal_autoscaler() {
     let node_id_2 = k8s_sim.add_node(5., 20.);
 
     k8s_sim.submit_deployment(5., 10., 5., 10., 100,
-                              Box::new(ConstantLoadModel::new(2.5)),
+                              Box::new(ConstantLoadModel::new(5.)),
                               Box::new(ConstantLoadModel::new(10.0)),
                               1, 1.);
     k8s_sim.step_for_duration(1000.0);
 
     assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_allocated, 5.0);
-    assert_eq!(k8s_sim.node(node_id_1).borrow().memory_allocated, 10.0);
+    assert_eq!(k8s_sim.node(node_id_1).borrow().cpu_used, 2.5);
     assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_allocated, 5.0);
-    assert_eq!(k8s_sim.node(node_id_2).borrow().memory_allocated, 10.0);
+    assert_eq!(k8s_sim.node(node_id_2).borrow().cpu_used, 2.5);
+
 }

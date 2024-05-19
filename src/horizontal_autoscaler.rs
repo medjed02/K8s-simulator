@@ -35,7 +35,7 @@ impl HorizontalAutoscaler {
     pub fn try_to_scale(&mut self) {
         let api_server = self.api_server.borrow();
         let metrics_server = self.metrics_server.borrow();
-        for (deployment, replicas) in &api_server.deployment_to_replicas {
+        for (deployment_id, replicas) in &api_server.deployment_to_replicas {
             let statistics = replicas.into_iter()
                 .map(|id| metrics_server.get_pod_statistics(*id));
             let not_fully_deployed = statistics.clone()
@@ -47,6 +47,8 @@ impl HorizontalAutoscaler {
             let statistics = statistics
                 .map(|statistic| statistic.unwrap())
                 .collect::<Vec<PodStatistic>>();
+
+            let deployment = api_server.deployments.get(deployment_id).unwrap();
             let new_cnt_replicas = self.hpa_algorithm
                 .get_new_count_replicas(deployment, &statistics, self.ctx.time());
             if new_cnt_replicas != deployment.cnt_replicas {

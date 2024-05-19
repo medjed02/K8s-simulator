@@ -80,7 +80,7 @@ impl EventHandler for ClusterAutoscaler {
                     self.sim_config.cluster_autoscaler_scan_interval);
             }
             AllocateNewDefaultNodes { cnt_nodes } => {
-                for _ in 0..cnt_nodes {
+                for _ in 0..cnt_nodes.min(self.cloud_nodes_pool.len() as u32) {
                     self.allocate_new_node();
                 }
             }

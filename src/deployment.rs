@@ -19,12 +19,14 @@ pub struct Deployment {
     pub id: u64,
     pub pod_template: PodTemplate,
     pub cnt_replicas: u64,
+    pub start_time: f64,
 }
 
 impl Deployment {
     pub fn new(id: u64, pod_template: PodTemplate, cnt_replicas: u64) -> Self {
         Self {
-            id, pod_template, cnt_replicas
+            id, pod_template, cnt_replicas,
+            start_time: -1.,
         }
     }
 
@@ -37,7 +39,7 @@ impl Deployment {
                  self.pod_template.limit_cpu,
                  self.pod_template.limit_memory,
                  self.pod_template.priority_weight,
-                 PodStatus::Pending)
+                 PodStatus::Pending, Some(self.id))
     }
 }
 

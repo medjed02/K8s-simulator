@@ -10,7 +10,7 @@ use serde::Serialize;
 /// which allows to model load peak at the beginning of Pod lifecycle.
 /// This time is dropped to zero when Pod is migrated.
 pub trait LoadModel: DynClone + erased_serde::Serialize {
-    fn get_resource(&mut self, time: f64, time_from_start: f64) -> f64;
+    fn get_resource(&mut self, time: f64, time_from_start: f64, cnt_replicas: u64) -> f64;
 }
 
 clone_trait_object!(LoadModel);
@@ -28,8 +28,8 @@ impl ConstantLoadModel {
 }
 
 impl LoadModel for ConstantLoadModel {
-    fn get_resource(&mut self, _time: f64, _time_from_start: f64) -> f64 {
-        self.resource
+    fn get_resource(&mut self, _time: f64, _time_from_start: f64, cnt_replicas: u64) -> f64 {
+        self.resource / cnt_replicas as f64
     }
 }
 
@@ -49,9 +49,9 @@ impl DecreaseLoadModel {
 }
 
 impl LoadModel for DecreaseLoadModel {
-    fn get_resource(&mut self, _time: f64, _time_from_start: f64) -> f64 {
-        self.start_resource - (_time_from_start / self.decrease_time).min(1.0) *
-            (self.start_resource - self.end_resource)
+    fn get_resource(&mut self, _time: f64, _time_from_start: f64, cnt_replicas: u64) -> f64 {
+        (self.start_resource - (_time_from_start / self.decrease_time).min(1.0) *
+            (self.start_resource - self.end_resource)) / cnt_replicas as f64
     }
 }
 
@@ -71,9 +71,9 @@ impl IncreaseLoadModel {
 }
 
 impl LoadModel for IncreaseLoadModel {
-    fn get_resource(&mut self, _time: f64, _time_from_start: f64) -> f64 {
-        self.start_resource + (_time_from_start / self.increase_time).min(1.0) *
-            (self.end_resource - self.start_resource)
+    fn get_resource(&mut self, _time: f64, _time_from_start: f64, cnt_replicas: u64) -> f64 {
+        (self.start_resource + (_time_from_start / self.increase_time).min(1.0) *
+            (self.end_resource - self.start_resource)) / cnt_replicas as f64
     }
 }
 
@@ -107,12 +107,12 @@ impl TraceLoadModel {
 }
 
 impl LoadModel for TraceLoadModel {
-    fn get_resource(&mut self, time: f64, time_from_start: f64) -> f64 {
+    fn get_resource(&mut self, time: f64, time_from_start: f64, cnt_replicas: u64) -> f64 {
         let timestamp = time - time_from_start;
         if self.resource_history[self.now_ptr].timestamp > timestamp {
             self.now_ptr = 0;
         }
         self.now_ptr = self.get_now_resource_snapshot(self.now_ptr, timestamp);
-        self.resource_history[self.now_ptr].resource
+        self.resource_history[self.now_ptr].resource / cnt_replicas as f64
     }
 }

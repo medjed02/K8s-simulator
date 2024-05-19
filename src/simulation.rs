@@ -206,7 +206,7 @@ impl K8sSimulation {
         let id = self.api_server.borrow_mut().generate_pod_id();
         let pod = Pod::new(id, cpu_load_model, memory_load_model, requested_cpu,
                            requested_memory, limit_cpu, limit_memory, priority_weight,
-                           PodStatus::Pending);
+                           PodStatus::Pending, None);
         self.ctx.emit(PodAssigningRequest { pod }, self.api_server.borrow().id, delay);
         id
     }

@@ -82,6 +82,7 @@ struct RawSimulationConfig {
     pub vpa_interval: Option<f64>,
     pub hpa_interval: Option<f64>,
     pub memory_pressure_threshold: Option<f64>,
+    pub update_pods_resources_period: Option<f64>,
     pub nodes: Option<Vec<NodeConfig>>,
     pub trace: Option<DatasetConfig>,
 }
@@ -118,6 +119,7 @@ pub struct SimulationConfig {
     /// Time of HPA interval
     pub hpa_interval: f64,
     pub memory_pressure_threshold: f64,
+    pub update_pods_resources_period: f64,
     /// Configurations of nodes.
     pub nodes: Vec<NodeConfig>,
     /// Used trace dataset.
@@ -144,6 +146,7 @@ impl SimulationConfig {
             vpa_interval: 30.0,
             hpa_interval: 30.0,
             memory_pressure_threshold: 0.95,
+            update_pods_resources_period: 10.0,
             nodes: Vec::default(),
             trace: None,
         }
@@ -170,6 +173,7 @@ impl SimulationConfig {
             vpa_interval: raw.vpa_interval.unwrap_or(30.0),
             hpa_interval: raw.hpa_interval.unwrap_or(30.0),
             memory_pressure_threshold: raw.memory_pressure_threshold.unwrap_or(0.95),
+            update_pods_resources_period: raw.update_pods_resources_period.unwrap_or(10.0),
             nodes: raw.nodes.unwrap_or_default(),
             trace: raw.trace,
         }

@@ -60,6 +60,11 @@ impl VerticalAutoscaler {
             }
             let pod = pod.unwrap();
 
+            // no vpa for deployments
+            if pod.deployment_id.is_some() {
+                continue;
+            }
+
             let recommendation = self.vpa_algorithm.get_recommendation(pod, statistic);
             if recommendation.is_some() {
                 recommendations.push(recommendation.unwrap());

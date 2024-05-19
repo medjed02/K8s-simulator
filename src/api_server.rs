@@ -9,6 +9,7 @@ use crate::pod::Pod;
 use dslab_core::context::SimulationContext;
 use dslab_core::event::Event;
 use dslab_core::handler::EventHandler;
+use rand::distributions::uniform::SampleBorrow;
 use crate::node::{Node, NodeState};
 use crate::simulation_config::SimulationConfig;
 use sugars::{rc, refcell};
@@ -28,7 +29,8 @@ pub struct APIServer {
     pub working_nodes: BTreeMap<u32, Rc<RefCell<Node>>>,
     pub failed_nodes: BTreeMap<u32, Rc<RefCell<Node>>>,
     pub pod_to_node_map: HashMap<u64, u32>,
-    pub deployment_to_replicas: HashMap<Deployment, Vec<u64>>,
+    pub deployment_to_replicas: HashMap<u64, Vec<u64>>,
+    pub deployments_start_time: HashMap<u64, f64>,
     pub deployments: HashMap<u64, Deployment>,
 
     scheduler: Option<Rc<RefCell<Scheduler>>>,
@@ -57,6 +59,7 @@ impl APIServer {
             failed_nodes: BTreeMap::default(),
             pod_to_node_map: HashMap::default(),
             deployment_to_replicas: HashMap::default(),
+            deployments_start_time: HashMap::default(),
             deployments: HashMap::default(),
             scheduler: None,
             metrics_server: None,
@@ -125,7 +128,10 @@ impl APIServer {
         }
         let node_id = self.pod_to_node_map.get(&pod_id);
         if node_id.is_some() {
-            self.working_nodes.get(node_id.unwrap()).unwrap().borrow_mut().remove_pod(pod_id);
+            let node = self.working_nodes.get(node_id.unwrap());
+            if node.is_some() {
+                node.unwrap().borrow_mut().remove_pod(pod_id);
+            }
         }
         self.pod_to_node_map.remove(&pod_id);
     }
@@ -133,6 +139,31 @@ impl APIServer {
     /// Get list of working nodes
     pub fn get_working_nodes(&self) -> &BTreeMap<u32, Rc<RefCell<Node>>> {
         &self.working_nodes
+    }
+
+    pub fn get_real_cnt_replicas(&self, deployment_id: u64) -> u64 {
+        let replica_ids = self.deployment_to_replicas.get(&deployment_id);
+        if replica_ids.is_none() {
+            return 1;
+        }
+        let replica_ids = replica_ids.unwrap();
+
+        let mut replica_cnt: u64 = 0;
+        for pod_id in replica_ids {
+            if self.pod_to_node_map.get(pod_id).is_none() {
+                continue;
+            }
+            replica_cnt += 1;
+        }
+        replica_cnt
+    }
+
+    pub fn get_deployment_start_time(&self, deployment_id: u64) -> f64 {
+        let start_time = self.deployments_start_time.get(&deployment_id);
+        if start_time.is_none() {
+            return -1.0;
+        }
+        *start_time.unwrap()
     }
 
     /// Returns the average allocated CPU across all working nodes.
@@ -223,6 +254,80 @@ impl APIServer {
         memory_overuse_count
     }
 
+    pub fn deployments_cpu_utilization(&self) -> f64 {
+        let mut sum_cpu_utilization: f64 = 0.0;
+        for (_, deployment) in self.deployments.iter() {
+            let replica_ids = self.deployment_to_replicas.get(&deployment.id);
+            if replica_ids.is_none() {
+                continue
+            }
+            let replica_ids = replica_ids.unwrap();
+
+            let mut sum_cpu: f64 = 0.0;
+            for pod_id in replica_ids {
+                let node_id = self.pod_to_node_map.get(pod_id);
+                if node_id.is_none() {
+                    continue;
+                }
+                let node = self.working_nodes.get(node_id.unwrap());
+                if node.is_none() {
+                    continue;
+                }
+                let node = node.unwrap().borrow();
+                let pod = node.pods.get(pod_id);
+                if pod.is_some() {
+                    sum_cpu += pod.unwrap().cpu as f64;
+                }
+            }
+            sum_cpu /= replica_ids.len() as f64;
+
+            sum_cpu_utilization += sum_cpu / deployment.pod_template.requested_cpu as f64;
+        }
+
+        if self.deployments.is_empty() {
+            0.0
+        } else {
+            sum_cpu_utilization / (self.deployments.len() as f64)
+        }
+    }
+
+    pub fn deployments_memory_utilization(&self) -> f64 {
+        let mut sum_memory_utilization: f64 = 0.0;
+        for (_, deployment) in self.deployments.iter() {
+            let replica_ids = self.deployment_to_replicas.get(&deployment.id);
+            if replica_ids.is_none() {
+                continue
+            }
+            let replica_ids = replica_ids.unwrap();
+
+            let mut sum_memory: f64 = 0.0;
+            for pod_id in replica_ids {
+                let node_id = self.pod_to_node_map.get(pod_id);
+                if node_id.is_none() {
+                    continue;
+                }
+                let node = self.working_nodes.get(node_id.unwrap());
+                if node.is_none() {
+                    continue;
+                }
+                let node = node.unwrap().borrow();
+                let pod = node.pods.get(pod_id);
+                if pod.is_some() {
+                    sum_memory += pod.unwrap().memory;
+                }
+            }
+            sum_memory /= replica_ids.len() as f64;
+
+            sum_memory_utilization += sum_memory / deployment.pod_template.requested_memory;
+        }
+
+        if self.deployments.is_empty() {
+            0.0
+        } else {
+            sum_memory_utilization / (self.deployments.len() as f64)
+        }
+    }
+
     pub fn log_metrics(&mut self) {
         let metrics = Metrics::new(
             self.ctx.time(),
@@ -236,6 +341,9 @@ impl APIServer {
             self.memory_used_load_rate(),
             self.pod_migration_count,
             self.memory_overuse_count(),
+            self.working_nodes.len() as u64,
+            self.deployments_cpu_utilization(),
+            self.deployments_memory_utilization(),
         );
         self.metrics_logger.log_metrics(metrics);
     }
@@ -272,8 +380,13 @@ impl EventHandler for APIServer {
                 self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
             }
             PodAssigningSucceeded { pod, node_id } => {
-                self.ctx.emit(PodPlacementRequest { pod, node_id },
-                    self.working_nodes.get(&node_id).unwrap().borrow().id, self.sim_config.message_delay);
+                if self.working_nodes.get(&node_id).is_none() {
+                    self.scheduler.clone().unwrap().borrow_mut().add_pod(pod);
+                } else {
+                    self.ctx.emit(PodPlacementRequest { pod, node_id },
+                        self.working_nodes.get(&node_id).unwrap().borrow().id,
+                        self.sim_config.message_delay);
+                }
             }
             PodPlacementSucceeded { pod_id, node_id } => {
                 self.pod_to_node_map.insert(pod_id, node_id);
@@ -296,7 +409,7 @@ impl EventHandler for APIServer {
                     replicas.push(id);
                 }
                 self.deployments.insert(deployment.id, deployment.clone());
-                self.deployment_to_replicas.insert(deployment, replicas);
+                self.deployment_to_replicas.insert(deployment.id, replicas);
             }
             DeploymentHorizontalAutoscaling { id, new_cnt_replicas } => {
                 let deployment = self.deployments.remove(&id);
@@ -304,7 +417,7 @@ impl EventHandler for APIServer {
                     return;
                 }
                 let mut deployment = deployment.unwrap();
-                let mut replicas = self.deployment_to_replicas.remove(&deployment).unwrap();
+                let mut replicas = self.deployment_to_replicas.remove(&id).unwrap();
                 if new_cnt_replicas < deployment.cnt_replicas {
                     for _ in 0..(deployment.cnt_replicas - new_cnt_replicas) {
                         let pod_id = replicas.pop().unwrap();
@@ -320,7 +433,7 @@ impl EventHandler for APIServer {
                 }
                 deployment.cnt_replicas = new_cnt_replicas;
                 self.deployments.insert(deployment.id, deployment.clone());
-                self.deployment_to_replicas.insert(deployment, replicas);
+                self.deployment_to_replicas.insert(id, replicas);
             }
             MetricsSnapshot {} => {
                 self.log_metrics();

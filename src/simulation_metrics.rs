@@ -15,6 +15,9 @@ pub struct Metrics {
     pub memory_used_load_rate: f64,
     pub pod_migration_count: u64,
     pub memory_overuse_count: u64,
+    pub nodes_count: u64,
+    pub deployments_cpu_utilization: f64,
+    pub deployments_memory_utilization: f64,
 }
 
 impl Metrics {
@@ -22,7 +25,8 @@ impl Metrics {
                cpu_allocated_load_rate: f64, memory_allocated_load_rate: f64,
                average_cpu_used: f64, average_memory_used: f64,
                cpu_used_load_rate: f64, memory_used_load_rate: f64,
-               pod_migration_count: u64, memory_overuse_count: u64) -> Self {
+               pod_migration_count: u64, memory_overuse_count: u64, nodes_count: u64,
+               deployments_cpu_utilization: f64, deployments_memory_utilization: f64) -> Self {
         Self {
             timestamp,
             average_cpu_allocated,
@@ -35,6 +39,9 @@ impl Metrics {
             memory_used_load_rate,
             pod_migration_count,
             memory_overuse_count,
+            nodes_count,
+            deployments_cpu_utilization,
+            deployments_memory_utilization
         }
     }
 }

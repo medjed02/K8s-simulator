@@ -14,8 +14,6 @@ use crate::events::pod::PodRequestAndLimitsChange;
 use crate::pod::Pod;
 use crate::simulation_config::SimulationConfig;
 
-const UPDATE_PODS_RESOURCES_PERIOD: f64 = 300.0;
-
 /// Node state (for imitation crash of the node)
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub enum NodeState {
@@ -59,7 +57,7 @@ impl Node {
         ctx: SimulationContext,
         sim_config: Rc<SimulationConfig>,
     ) -> Self {
-        ctx.emit(UpdatePodsResources{}, ctx.id(), UPDATE_PODS_RESOURCES_PERIOD);
+        ctx.emit(UpdatePodsResources{}, ctx.id(), sim_config.update_pods_resources_period);
         Self {
             id: ctx.id(),
             cpu_total,
@@ -94,14 +92,26 @@ impl Node {
     }
 
     pub fn add_pod(&mut self, mut pod: Pod) -> Option<Pod> {
-        let wanted_memory=  pod.get_wanted_memory(self.ctx.time()).min(pod.limit_memory);
+        pod.start_time = self.ctx.time();
+
+        let mut cnt_replicas: u64 = 1;
+        if pod.deployment_id.is_some() {
+            let deployment_start_time = self.api_server.borrow()
+                .get_deployment_start_time(pod.deployment_id.unwrap());
+            if deployment_start_time >= 0. {
+                pod.start_time = deployment_start_time;
+            }
+            cnt_replicas = self.api_server.borrow()
+                .get_real_cnt_replicas(pod.deployment_id.unwrap());
+        }
+
+        let wanted_memory=  pod.get_wanted_memory(self.ctx.time(), cnt_replicas)
+            .min(pod.limit_memory);
         if self.get_free_cpu() < pod.requested_cpu || self.get_free_memory() < wanted_memory {
             return Some(pod);
         }
 
-        pod.start_time = self.ctx.time();
-
-        pod.cpu = pod.get_wanted_cpu(self.ctx.time())
+        pod.cpu = pod.get_wanted_cpu(self.ctx.time(), cnt_replicas)
             .min(pod.limit_cpu as f64)
             .min(self.get_free_cpu() as f64) as f32;
         pod.memory = wanted_memory;
@@ -112,6 +122,10 @@ impl Node {
         self.cpu_allocated += pod.cpu.max(pod.requested_cpu);
         self.memory_allocated += pod.memory.max(pod.requested_memory);
 
+        if pod.deployment_id.is_some() {
+            self.api_server.borrow_mut()
+                .deployments_start_time.insert(pod.deployment_id.unwrap(), pod.start_time);
+        }
         self.pods.insert(pod.id, pod);
         None
     }
@@ -142,7 +156,14 @@ impl Node {
     fn update_pods_resources(&mut self) {
         let mut pods_to_evict = Vec::default();
         for (_, pod) in self.pods.iter_mut() {
-            let wanted_memory = pod.get_wanted_memory(self.ctx.time()).min(pod.limit_memory);
+            let mut cnt_replicas: u64 = 1;
+            if pod.deployment_id.is_some() {
+                cnt_replicas = self.api_server.borrow()
+                    .get_real_cnt_replicas(pod.deployment_id.unwrap());
+            }
+
+            let wanted_memory = pod.get_wanted_memory(self.ctx.time(), cnt_replicas)
+                .min(pod.limit_memory);
             if wanted_memory > pod.requested_memory {
                 self.memory_overuse_count += 1;
             }
@@ -156,7 +177,8 @@ impl Node {
                 pod.memory = wanted_memory;
             }
 
-            let wanted_cpu = pod.get_wanted_cpu(self.ctx.time()).min(pod.limit_cpu as f64);
+            let wanted_cpu = pod.get_wanted_cpu(self.ctx.time(), cnt_replicas)
+                .min(pod.limit_cpu as f64);
             let free_cpu = (self.cpu_total as f32) - self.cpu_allocated;
             let new_cpu = pod.cpu + ((wanted_cpu as f32) - pod.cpu).min(free_cpu);
             self.cpu_allocated = self.cpu_allocated - pod.cpu.max(pod.requested_cpu) + new_cpu.max(pod.requested_cpu);
@@ -196,7 +218,7 @@ impl EventHandler for Node {
             }
             UpdatePodsResources {} => {
                 self.update_pods_resources();
-                self.ctx.emit(UpdatePodsResources{}, self.id, UPDATE_PODS_RESOURCES_PERIOD);
+                self.ctx.emit(UpdatePodsResources{}, self.id, self.sim_config.update_pods_resources_period);
             }
             PodRequestAndLimitsChange { pod_id, new_requested_cpu, new_limit_cpu,
                 new_requested_memory, new_limit_memory } => {

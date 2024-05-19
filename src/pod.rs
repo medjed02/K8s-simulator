@@ -3,6 +3,7 @@
 use std::fmt::{Display, Formatter};
 use std::cmp::Ordering;
 use serde::Serialize;
+use crate::deployment::Deployment;
 use crate::load_model::LoadModel;
 
 
@@ -48,6 +49,8 @@ pub struct Pod {
 
     pub start_time: f64,
     pub status: PodStatus,
+
+    pub deployment_id: Option<u64>,
 }
 
 impl Pod {
@@ -61,6 +64,7 @@ impl Pod {
         limit_memory: f64,
         priority_weight: u64,
         status: PodStatus,
+        deployment_id: Option<u64>,
     ) -> Self {
         Self {
             id,
@@ -77,14 +81,15 @@ impl Pod {
             scheduling_timestamp: None,
             start_time: 0.0,
             status,
+            deployment_id,
         }
     }
-    pub fn get_wanted_cpu(&mut self, time: f64) -> f64 {
-        self.cpu_load_model.get_resource(time, time - self.start_time)
+    pub fn get_wanted_cpu(&mut self, time: f64, cnt_replicas: u64) -> f64 {
+        self.cpu_load_model.get_resource(time, time - self.start_time, cnt_replicas)
     }
 
-    pub fn get_wanted_memory(&mut self, time: f64) -> f64 {
-        self.memory_load_model.get_resource(time, time - self.start_time)
+    pub fn get_wanted_memory(&mut self, time: f64, cnt_replicas: u64) -> f64 {
+        self.memory_load_model.get_resource(time, time - self.start_time, cnt_replicas)
     }
 }
 

@@ -1,5 +1,4 @@
 use std::fs::File;
-use crate::deployment::Deployment;
 use crate::load_model::{ConstantLoadModel, LoadModel, ResourceSnapshot, TraceLoadModel};
 
 #[derive(Clone)]
