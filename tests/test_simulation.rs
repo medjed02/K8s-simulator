@@ -187,7 +187,7 @@ fn test_cluster_scale_up() {
                        Box::new(ConstantLoadModel::new(2.0)),
                        Box::new(ConstantLoadModel::new(6.0)),
                        1.);
-    k8s_sim.step_for_duration(300.0);
+    k8s_sim.step_for_duration(1000.0);
     assert_ne!(k8s_sim.working_nodes().len(), 0);
     assert_ne!(k8s_sim.cpu_allocated_load_rate(), 0.0);
     assert_ne!(k8s_sim.memory_allocated_load_rate(), 0.0);

@@ -2,6 +2,7 @@ use std::cell::RefCell;
 use std::cmp::max;
 use std::collections::{BTreeMap, HashMap};
 use std::rc::Rc;
+use serde::{Deserialize, Serialize};
 use crate::cluster_autoscaler_algorithm::ClusterAutoscalerAlgorithm;
 use crate::node::Node;
 use crate::pod::Pod;
@@ -30,25 +31,76 @@ impl SimpleClusterAutoscalerAlgorithm {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+struct SimpleNode {
+    pub cpu_allocated: f32,
+    pub memory_allocated: f64,
+    pub cpu_total: f32,
+    pub memory_total: f64,
+}
+
+#[derive(Debug, PartialEq, Clone, Copy)]
+struct SimplePod {
+    pub requested_cpu: f32,
+    pub requested_memory: f64,
+}
+
 impl ClusterAutoscalerAlgorithm for SimpleClusterAutoscalerAlgorithm {
     fn try_to_scale_up(&mut self, pending_pods: &Vec<Pod>, now_time: f64,
                        default_node: &NodeConfig) -> u32 {
         if pending_pods.is_empty() {
             return 0;
         }
-        if self.last_scale_up_time + self.last_scale_up_time > now_time {
+        if self.last_scale_up_time + self.scale_up_delay > now_time {
             return 0;
         }
-        let mut sum_cpu = 0.0;
-        let mut sum_memory = 0.0;
-        for pod in pending_pods {
-            sum_cpu += pod.requested_cpu;
-            sum_memory += pod.requested_memory;
+
+        let mut nodes = Vec::<SimpleNode>::default();
+        nodes.push(SimpleNode {
+            cpu_allocated: 0., memory_allocated: 0.,
+            cpu_total: default_node.cpu, memory_total: default_node.memory,
+        });
+
+        let mut pods: Vec<SimplePod> = pending_pods.iter()
+            .map(
+                |pod| SimplePod {
+                    requested_cpu: pod.requested_cpu, requested_memory: pod.requested_memory
+                })
+            .collect();
+
+        for pod in pods {
+            let mut filtered_nodes: Vec<&mut SimpleNode> = nodes.iter_mut()
+                .filter(
+                    |node| node.cpu_allocated + pod.requested_cpu <= node.cpu_total &&
+                        node.memory_allocated + pod.requested_memory <= node.memory_total
+                )
+                .collect();
+
+            if filtered_nodes.is_empty() {
+                drop(filtered_nodes);
+                nodes.push(SimpleNode {
+                    cpu_allocated: pod.requested_cpu, memory_allocated: pod.requested_memory,
+                    cpu_total: default_node.cpu, memory_total: default_node.memory,
+                });
+            } else {
+                let mut max_prior_ind = 0;
+                let mut max_prior = -1.0;
+                for i in 0..filtered_nodes.len() {
+                    let node = &filtered_nodes[i];
+                    let cpu_utilization = (node.cpu_allocated + pod.requested_cpu) / node.cpu_total;
+                    let memory_utilization = (node.memory_allocated + pod.requested_memory) / node.memory_total;
+                    let prior = (1.0 - cpu_utilization as f64) + (1.0 - memory_utilization);
+                    if prior > max_prior {
+                        max_prior = prior;
+                        max_prior_ind = i;
+                    }
+                }
+                filtered_nodes[max_prior_ind].cpu_allocated += pod.requested_cpu;
+                filtered_nodes[max_prior_ind].memory_allocated += pod.requested_memory;
+            }
         }
-        let need_default_nodes_cpu = (sum_cpu / (default_node.cpu as f32)).ceil() as u32;
-        let need_default_nodes_memory = (sum_memory / (default_node.memory as f64)).ceil() as u32;
-        self.last_scale_up_time = now_time;
-        return max(need_default_nodes_cpu, need_default_nodes_memory);
+
+        return nodes.len() as u32;
     }
 
     fn try_to_scale_down(&mut self, working_nodes: &BTreeMap<u32, Rc<RefCell<Node>>>,
