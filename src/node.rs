@@ -105,13 +105,13 @@ impl Node {
                 .get_real_cnt_replicas(pod.deployment_id.unwrap());
         }
 
-        let wanted_memory=  pod.get_wanted_memory(self.ctx.time(), cnt_replicas)
+        let wanted_memory=  pod.get_wanted_memory(self.ctx.time(), cnt_replicas + 1)
             .min(pod.limit_memory);
         if self.get_free_cpu() < pod.requested_cpu || self.get_free_memory() < wanted_memory {
             return Some(pod);
         }
 
-        pod.cpu = pod.get_wanted_cpu(self.ctx.time(), cnt_replicas)
+        pod.cpu = pod.get_wanted_cpu(self.ctx.time(), cnt_replicas + 1)
             .min(pod.limit_cpu as f64)
             .min(self.get_free_cpu() as f64) as f32;
         pod.memory = wanted_memory;

@@ -107,12 +107,11 @@ impl TraceLoadModel {
 }
 
 impl LoadModel for TraceLoadModel {
-    fn get_resource(&mut self, time: f64, time_from_start: f64, cnt_replicas: u64) -> f64 {
-        let timestamp = time - time_from_start;
-        if self.resource_history[self.now_ptr].timestamp > timestamp {
+    fn get_resource(&mut self, _time: f64, time_from_start: f64, cnt_replicas: u64) -> f64 {
+        if self.resource_history[self.now_ptr].timestamp > time_from_start {
             self.now_ptr = 0;
         }
-        self.now_ptr = self.get_now_resource_snapshot(self.now_ptr, timestamp);
+        self.now_ptr = self.get_now_resource_snapshot(self.now_ptr, time_from_start);
         self.resource_history[self.now_ptr].resource / cnt_replicas as f64
     }
 }

@@ -344,6 +344,7 @@ impl APIServer {
             self.working_nodes.len() as u64,
             self.deployments_cpu_utilization(),
             self.deployments_memory_utilization(),
+            self.pod_to_node_map.len() as u64,
         );
         self.metrics_logger.log_metrics(metrics);
     }
